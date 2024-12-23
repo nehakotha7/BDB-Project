@@ -26,7 +26,7 @@ plays <- read.csv("plays.csv")
 tracking_w_1 <- read.csv("tracking_week_1.csv")
 tracking_w_4 <- read.csv("tracking_week_4.csv")
 
-# ------------------- WORKING SPACE
+# ------------------- Determine who is the player in motion after specifying gameId and playId
 #(gameId == 2022100300, playId == 438) Kyle Juszczyk play - LA vs SF
 # identify specific play to analyze
 specific_play <- plays |> 
@@ -69,47 +69,6 @@ playId <- 344
 gameId <- 2022100213
 player_in_motion <- get_player_in_motion(playId, gameId, plays, tracking_w_4) 
 print(player_in_motion)
-#----------------------------testing testing
-get_player_in_motion <- function(playId, gameId, plays, tracking_w_4) { 
-  # Filter the plays data to get the specific play
-  specific_play <- plays |>
-    filter(gameId == gameId, playId == playId)
-  
-  # Check if specific play exists
-  if (nrow(specific_play) == 0) {
-    stop("No matching play found for the given gameId and playId.")
-  }
-  
-  # Extract the possession team from the specific play
-  possession_team <- specific_play$possessionTeam[1]
-  
-  # Merge specific play with tracking data
-  merged_data <- tracking_w_4 |>
-    filter(gameId == gameId, playId == playId)
-  
-  # Filter the merged data for the specific play and frameType 'SNAP'
-  play_data <- merged_data |>
-    filter(frameType == "SNAP")
-  
-  # Identify players in motion (dis >= 0.1) from the possession team
-  player_in_motion <- play_data |>  
-    filter(dis >= 0.1 & club == possession_team)
-  
-  # Return the display names of players in motion
-  return(unique(player_in_motion$displayName))
-}
-
-
-playId <- 344
-gameId <- 2022100213
-player_in_motion <- get_player_in_motion(playId, gameId, plays, tracking_w_4) 
-print(player_in_motion)
-
-
-SF_LA_motion <- tracking_w_4 |> 
-  filter(gameId == 2022100300, playId == 438, displayName =="Kyle Juszczyk")
-
-View(SF_LA_motion)
      
 
 # ------------------- motion is TRUE and RB had rush attempt
