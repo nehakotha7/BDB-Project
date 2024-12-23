@@ -23,9 +23,270 @@ games <- read.csv("games.csv")
 player_play <- read.csv("player_play.csv")
 players <- read.csv("players.csv")
 plays <- read.csv("plays.csv")
-
 tracking_w_1 <- read.csv("tracking_week_1.csv")
 tracking_w_4 <- read.csv("tracking_week_4.csv")
+
+# ------------------- WORKING SPACE
+#(gameId == 2022100300, playId == 438) Kyle Juszczyk play - LA vs SF
+# identify specific play to analyze
+specific_play <- plays |> 
+  filter(possessionTeam == 'SF', 
+         defensiveTeam == 'LA', 
+         quarter == 1, down == 1, 
+         yardsToGo == 10, preSnapHomeScore==0, preSnapVisitorScore==3) 
+View(specific_play)
+
+
+# Function to get players in motion
+
+get_player_in_motion <- function(playId, gameId, plays, tracking_w_4) { 
+  # Filter the plays data to get the specific play 
+  specific_play <- plays |>
+    filter(gameId ==2022100213, playId == 344)
+  
+  # Extract the possession team from the specific play
+  possession_team <- specific_play$possessionTeam
+  
+  # Merge specific play with tracking data
+  merged_data <- merge(specific_play, tracking_w_4, by = c("gameId", "playId"))
+
+  # Filter the merged data for the specific play and frameType 'SNAP'
+  play_data <- merged_data |> 
+    filter(frameType == "SNAP")
+  
+  # Identify players in motion (dis >= 0.1) from the possession team
+  player_in_motion <- play_data |>  
+    filter(dis >= 0.1 & club == possession_team)
+  
+  # Return the players in motion
+  return(player_in_motion$displayName)
+}
+print(player_in_motion$displayName)
+View(player_in_motion)
+
+# Example usage
+playId <- 344
+gameId <- 2022100213
+player_in_motion <- get_player_in_motion(playId, gameId, plays, tracking_w_4) 
+print(player_in_motion)
+#----------------------------testing testing
+get_player_in_motion <- function(playId, gameId, plays, tracking_w_4) { 
+  # Filter the plays data to get the specific play
+  specific_play <- plays |>
+    filter(gameId == gameId, playId == playId)
+  
+  # Check if specific play exists
+  if (nrow(specific_play) == 0) {
+    stop("No matching play found for the given gameId and playId.")
+  }
+  
+  # Extract the possession team from the specific play
+  possession_team <- specific_play$possessionTeam[1]
+  
+  # Merge specific play with tracking data
+  merged_data <- tracking_w_4 |>
+    filter(gameId == gameId, playId == playId)
+  
+  # Filter the merged data for the specific play and frameType 'SNAP'
+  play_data <- merged_data |>
+    filter(frameType == "SNAP")
+  
+  # Identify players in motion (dis >= 0.1) from the possession team
+  player_in_motion <- play_data |>  
+    filter(dis >= 0.1 & club == possession_team)
+  
+  # Return the display names of players in motion
+  return(unique(player_in_motion$displayName))
+}
+
+
+playId <- 344
+gameId <- 2022100213
+player_in_motion <- get_player_in_motion(playId, gameId, plays, tracking_w_4) 
+print(player_in_motion)
+
+
+SF_LA_motion <- tracking_w_4 |> 
+  filter(gameId == 2022100300, playId == 438, displayName =="Kyle Juszczyk")
+
+View(SF_LA_motion)
+     
+
+# ------------------- motion is TRUE and RB had rush attempt
+# Merge datasets by 'gameId' and 'playId'
+merged_data <- player_play |> 
+  inner_join(plays, by = c("gameId", "playId")) |> 
+  inner_join(players, by = "nflId")  # Join with player data using 'nflId'
+
+# Define running backs by position
+running_back_positions <- c("RB", "FB")
+
+# Filter for WR motion and RB rush attempts
+filtered_data <- merged_data |> 
+  filter(
+    (inMotionAtBallSnap == TRUE | motionSinceLineset == TRUE) & 
+      hadRushAttempt == TRUE & 
+      position %in% running_back_positions  # Use 'position' from player data
+  )
+
+# Add a column to classify play outcome: Positive yardage or not
+filtered_data <- filtered_data |> 
+  mutate(positive_yardage = ifelse(yardsGained > 0, TRUE, FALSE))
+
+# Summarize data: Include displayName and nflId in the grouping and output
+summary_data <- filtered_data |> 
+  group_by(gameId, playId, nflId, displayName) |>  # Group by player info
+  summarise(
+    total_yards = sum(yardsGained, na.rm = TRUE),  # Total yards gained
+    positive_yardage = any(positive_yardage),  # TRUE if any play in the group had positive yardage
+    hadRushAttempt = any(hadRushAttempt),  # TRUE if any rush attempt occurred in the group
+    .groups = "drop"  # Avoid grouped data frames in the output
+  )
+
+positive_count <- summary_data |> 
+  filter(positive_yardage == TRUE) |> 
+  nrow()
+
+negative_count <- summary_data |> 
+  filter(positive_yardage == FALSE) |> 
+  nrow()
+
+# Create a data frame to store the counts
+positive_negative_counts <- data.frame(
+  Positive_Yardage = c("TRUE", "FALSE"),
+  Count = c(positive_count, negative_count)
+)
+
+# View the data frame
+View(positive_negative_counts)
+# View the summarized data
+View(summary_data)
+
+#-------------------possible logistic reg model and plot (incorrect right now)
+
+model <- glm(positive_yardage ~ inMotionAtBallSnap + motionSinceLineset, 
+             data = filtered_data, family = "binomial")
+summary(model)
+
+# Generate the predicted probabilities based on the logistic model
+filtered_data$predicted_prob <- predict(model, type = "response")
+
+# Plot the predicted probabilities based on the motion variables
+ggplot(filtered_data, aes(x = inMotionAtBallSnap, y = predicted_prob, color = factor(motionSinceLineset))) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "black") +
+  labs(title = "Predicted Probability of Positive Yardage",
+       x = "In Motion at Ball Snap",
+       y = "Predicted Probability",
+       color = "Motion Since Lineset") +
+  theme_minimal()
+# ------------------- direction of motion, targeted player, and yards gained
+
+# 1. Filter for players in motion
+motion_tracking_data <- player_play |> 
+  filter(inMotionAtBallSnap == TRUE | shiftSinceLineset == TRUE | motionSinceLineset == TRUE) |> 
+  left_join(tracking_w_4, by = c("gameId", "playId", "nflId")) |> 
+  arrange(gameId, playId, time)
+
+# 2. Join with play data to add contextual play information
+motion_tracking_data <- motion_tracking_data |> 
+  left_join(plays, by = c("gameId", "playId")) |> 
+  filter(down %in% c(1, 2)) %>%  # Analyze 1st and 2nd downs
+  mutate(
+    motionDirection = ifelse(dir >= 90 & dir <= 270, "left-to-right", "right-to-left"),
+    positiveYardage = ifelse(yardsGained > 0, TRUE, FALSE)
+  )
+
+# 3. Join with game data 
+motion_tracking_data <- motion_tracking_data |> 
+  left_join(games, by = "gameId")
+
+# 4. Identify if the motioned player was targeted
+motion_tracking_data <- motion_tracking_data |> 
+  mutate(
+    motionedPlayerTargeted = ifelse(wasTargettedReceiver == 1, TRUE, FALSE),
+    playResult = case_when(
+      yardsGained > 0 ~ "Positive Yardage",
+      yardsGained <= 0 ~ "No Gain or Loss"
+    )
+  )
+
+# 5. Select relevant variables for analysis
+motion_analysis <- motion_tracking_data |> 
+  select(
+    gameId, playId, nflId, displayName, teamAbbr, x, y, s, a, dis, 
+    motionDirection, motionedPlayerTargeted, playResult, yardsGained, 
+    gameClock, down, possessionTeam, defensiveTeam, passResult, 
+    targetX, targetY, homeTeamAbbr, visitorTeamAbbr, gameDate
+  )
+
+# 6. Summary statistics and insights
+motion_summary <- motion_analysis |> 
+  group_by(motionDirection, motionedPlayerTargeted, playResult) |> 
+  summarise(
+    averageYards = mean(yardsGained, na.rm = TRUE),
+    totalPlays = n(),
+    .groups = 'drop'
+  )
+
+# Display results
+View(motion_analysis)
+View(motion_summary)
+
+
+# -------------------
+# Join player_play with tracking data on gameId, playId, arwnd nflId
+motion_tracking_data <- player_play |> 
+  filter(inMotionAtBallSnap == TRUE | shiftSinceLineset == TRUE | motionSinceLineset == TRUE) |> 
+  left_join(tracking_w_4, by = c("gameId", "playId", "nflId")) |> 
+  arrange(gameId, playId, time)
+
+# Join with plays data to add gameClock and down, then filter for 1st and 2nd downs
+motion_tracking_data <- motion_tracking_data |> 
+  left_join(plays |> select(gameId, playId, down, gameClock, yardsGained), by = c("gameId", "playId")) |>  # Add `down` and `gameClock`
+  filter(down %in% c(1, 2)) |>  # Filter for 1st and 2nd downs
+  filter(yardsGained>0) |> 
+  select(gameId, playId, nflId, time, x, y, s, a, dis, inMotionAtBallSnap, shiftSinceLineset, motionSinceLineset, gameClock, down,  yardsGained)
+
+# Calculate distance traveled, speed, and acceleration. Check lag stuff, not sure what that does
+motion_tracking_data <- motion_tracking_data |>
+  group_by(gameId, playId, nflId) |>
+  mutate(
+    movement_type = ifelse(s > 6 & dis < 1, "Jet", 
+                            ifelse(s > 6 & abs(lag(x) - x) > 1, "Fly", 
+                                    ifelse(s < 4 & abs(lag(y) - y) > 0.5, "Glide", "Other")))
+  ) |>
+  ungroup()
+
+# View the processed data
+View(motion_tracking_data)
+
+motion_tracking_data <- motion_tracking_data |> 
+  group_by(gameId, playId, nflId) |> 
+  mutate(
+    movement_type = case_when(
+      s > 6 & dis < 1 ~ "Jet",  # Lower threshold for 'Jet' speed
+      s > 6 & abs(diff(x)) > 1 ~ "Fly",  # Adjust threshold for 'Fly' speed and distance
+      s < 4 & abs(diff(y)) > 0.5 ~ "Glide",  # Adjust thresholds for 'Glide'
+      TRUE ~ "Other"
+    )
+  ) |> 
+  ungroup()
+# -------------------
+
+# data frame for different offense formations, count, and frequency 
+unique_formations <- as.data.frame(table(plays$offenseFormation, useNA = "ifany"))
+colnames(unique_formations) <- c("formation", "count")
+total_rows <- nrow(plays)
+unique_formations$frequency <- (unique_formations$count / total_rows) *100
+View(unique_formations)
+
+# data frame for different offensive routes, count, and frequency 
+unique_routes_ran <- as.data.frame(table(player_play$routeRan, useNA = "ifany"))
+colnames(unique_routes_ran) <- c("route", "count")
+total_rows <- nrow(player_play)
+unique_routes_ran$frequency <- (unique_routes_ran$count / total_rows) *100
+View(unique_routes_ran)
 
 # Filter data for specific gameId, nflId, and displayName
 filtered_data <- tracking_w_1 |> 
