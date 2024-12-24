@@ -27,7 +27,8 @@ tracking_w_1 <- read.csv("tracking_week_1.csv")
 tracking_w_4 <- read.csv("tracking_week_4.csv")
 
 # ------------------- Determine who is the player in motion after specifying gameId and playId
-#(gameId == 2022100300, playId == 438) Kyle Juszczyk play - LA vs SF
+#(gameId == 2022100300, playId == 438) for Kyle Juszczyk play - LA vs SF
+
 # identify specific play to analyze
 specific_play <- plays |> 
   filter(possessionTeam == 'SF', 
@@ -42,7 +43,7 @@ View(specific_play)
 get_player_in_motion <- function(playId, gameId, plays, tracking_w_4) { 
   # Filter the plays data to get the specific play 
   specific_play <- plays |>
-    filter(gameId ==2022100213, playId == 344)
+    filter(gameId2 == gameId, playId2 ==playId)
   
   # Extract the possession team from the specific play
   possession_team <- specific_play$possessionTeam
@@ -61,12 +62,10 @@ get_player_in_motion <- function(playId, gameId, plays, tracking_w_4) {
   # Return the players in motion
   return(player_in_motion$displayName)
 }
-print(player_in_motion$displayName)
-View(player_in_motion)
 
 # Example usage
-playId <- 344
-gameId <- 2022100213
+playId2 <- 344
+gameId2 <- 2022100213
 player_in_motion <- get_player_in_motion(playId, gameId, plays, tracking_w_4) 
 print(player_in_motion)
      
