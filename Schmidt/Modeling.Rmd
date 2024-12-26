@@ -1,0 +1,62 @@
+---
+title: "Modeling"
+author: "Belle Schmidt"
+date: "2024-11-19"
+output: html_document
+---
+
+```{r}
+# reading out datasets
+library(kknn)
+library(tidymodels)
+library(glmnet)
+library(stringr)
+```
+
+```{r}
+# reading in dataset
+games <- read.csv("games.csv")
+player_play <- read.csv("player_play.csv")
+players <- read.csv("players.csv")
+plays <- read.csv("plays.csv")
+
+players |> 
+  filter(position %in% c("RB", "QB")) |> 
+  mutate(FirstNameInitial = str_extract(displayName, "^.{1}"),
+         LastName = word(displayName, -1)) |> 
+  count(FirstNameInitial, LastName) |> 
+  filter(n != 1)
+
+attempted_runs <- plays |> 
+  filter(is.na(timeToThrow),
+         is.na(timeToSack),
+         is.na(dropbackType),
+         passResult != "R") |> 
+         #pff_runConceptPrimary == "TRICK") |> 
+  drop_na(offenseFormation) 
+
+attempted_runs 
+
+plays |> 
+  filter(is.na(dropbackType))
+```
+
+
+# KNN Model
+```{r}
+knn_model <- nearest_neighbor(neighbors = 3, weight_func = "rectanglar") |> 
+  set_mode("classification") |> 
+  set_engine("kknn")
+
+knn_recipe <- recipe()
+```
+
+# Logisitic Regression Model
+
+```{r}
+logistic_model <- multinom_reg(mode = "classification",
+                               engine = "nnet")
+
+recipe <- ()
+```
+

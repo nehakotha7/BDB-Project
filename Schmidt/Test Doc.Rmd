@@ -1,6 +1,0 @@
----
-title: "Testing Document"
-author: "Belle Schmidt"
-date: "2024-11-19"
-output: html_document
----

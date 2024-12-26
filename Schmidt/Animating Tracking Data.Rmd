@@ -1,0 +1,328 @@
+---
+title: "Installing Data"
+author: "Belle Schmidt"
+date: "2024-12-02"
+output: ''
+---
+
+```{r}
+# code to install ggfootbaall
+#remotes::install_github("robkravec/ggfootball")
+```
+
+
+```{r}
+# reading in the packages necessary
+library(nflverse)
+library(nflreadr)
+library(nflplotR)
+library(ggplot2)
+library(tidyverse)
+library(gganimate)
+library(dplyr)
+library(gganimate)
+library(ggfootball)
+```
+
+```{r}
+# gives me more information about the nflreadr package
+library(help = "nflreadr")
+```
+
+```{r}
+# reading in dataset
+games <- read.csv("games.csv")
+player_play <- read.csv("player_play.csv")
+players <- read.csv("players.csv")
+plays <- read.csv("plays.csv")
+```
+
+```{r}
+# reading in week by week tracking data
+tracking_week1 <- read.csv("tracking_week_1.csv")
+tracking_week2 <- read.csv("tracking_week_2.csv")
+tracking_week3 <- read.csv("tracking_week_3.csv")
+tracking_week4 <- read.csv("tracking_week_4.csv")
+tracking_week5 <- read.csv("tracking_week_5.csv")
+tracking_week6 <- read.csv("tracking_week_6.csv")
+tracking_week7 <- read.csv("tracking_week_7.csv")
+tracking_week8 <- read.csv("tracking_week_9.csv")
+```
+
+```{r}
+player_play |> 
+  select(gameId, playId, nflId, motionSinceLineset, inMotionAtBallSnap, shiftSinceLineset)
+```
+
+```{r}
+# Filter data for specific gameId, nflId, and displayName
+filtered_data <- tracking_week1 |> 
+  filter(gameId == 2022091200, nflId == 35459, displayName == "Kareem Jackson")
+```
+
+```{r}
+# View the filtered data
+head(filtered_data)
+```
+
+```{r}
+# Sanders play
+PHI_JAG_Game <- plays |> 
+  filter(
+    gameId==2022100209,
+    quarter == 3,
+    possessionTeam=="PHI",
+    gameClock >= "03:35" & gameClock <= "03:45"  # Filter for gameClock between 3:35 and 3:45
+  ) |> 
+  arrange(gameClock)  
+
+View(PHI_JAG_Game)
+```
+
+```{r}
+# filter play by play data for a specific play. In this case, the Sander's play
+filtered_data_sanders <- tracking_week4  |> 
+  filter(
+    gameId==2022100209,
+    club == "PHI" | club == "JAX",
+    grepl("2022-10-02", time),
+    playId==2652
+  ) |> 
+arrange(desc(s)) 
+View(filtered_data_sanders)
+```
+
+# start of code for play animation --------------------------------------------
+# TO DO: add the ball, fix JAG color to make it red, make the animation prettier, 
+# get a better understanding of arrow orientation/make it flow smoother
+
+```{r}
+# all players on the field nflId's during sandars run play-----------------
+players_on_field <- filtered_data_sanders |> 
+  select(nflId, club, jerseyNumber) |> 
+  distinct()
+
+View(players_on_field)
+```
+
+```{r}
+# list of nflId's (players) on the field during Sander's run play
+nfl_Ids <- c(37266, 39950, 43352, 43368, 43787, 44902, 44926, 
+                46118, 46269, 47790, 47834, 47836, 52461, 52481, 
+                52553, 52608, 53439, 53462, 53466, 53494, 54492, 54758)
+```
+
+```{r}
+# filter tracking data to include specific players for this play and time range
+filtered_sanders_run_play <- tracking_week4 |> 
+  filter(
+    gameId == 2022100209,  
+    playId == 2652, 
+    nflId %in% nfl_Ids,  
+    grepl("2022-10-02", time),
+    !is.na(x) & !is.na(y) & !is.na(o) 
+  ) 
+View(filtered_sanders_run_play)
+```
+
+```{r}
+# Define team colors
+team_colors <- c("PHI" = "#004C54", "JAG" = "#D7A22A")
+```
+
+
+# Create an animation of all players' movement during the run play (3rd Q, PHI vs. JAG) ----------------
+
+```{r}
+animation_all_players <- ggfootball(left_endzone = "#004C54", right_endzone = "#D7A22A", field_alpha = 0.8) +
+  
+  # plot all players positions over time as points
+  geom_point(data = filtered_sanders_run_play, 
+             aes(x = x, y = y, fill = club), size = 4, shape = 21, color = "black", stroke = 0.5, show.legend = FALSE) + 
+  # add arrows for player orientation
+  geom_segment(data = filtered_sanders_run_play, 
+               aes(x = x, y = y, 
+                   xend = pmin(pmax(x + cos(o * pi / 180) * 5, 0), 120),  # multiplier to adjust arrow length
+                   yend = pmin(pmax(y + sin(o * pi / 180) * 5, 0), 53.3),   
+                   color = club),
+               arrow = arrow(type = "closed", length = unit(0.05, "inches")), size = 0.2, color = "black", show.legend = FALSE) +
+  # add labels for jersey numbers
+  geom_text(data = filtered_sanders_run_play, 
+            aes(x = x, y = y, label = jerseyNumber, color = club),
+            size = 3, vjust = -1, show.legend = FALSE) +
+  # set theme and limits for the plot
+  coord_fixed(xlim = c(0, 120), ylim = c(0, 53.3)) + 
+  scale_color_manual(values = c("#004C54", "white")) +  # map team colors for the borders (arrows and text)
+  scale_fill_manual(values = c("#004C54", "white")) +   # map team colors for the fill (inside of the points)
+  labs(title = "Player Movements During Run Play", 
+       subtitle = "Frame: {frame_time}", 
+       x = "X Position (yards)", y = "Y Position (yards)") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+```
+
+
+# create the animation with transition by frameId
+```{r}
+animation_all_players <- animation_all_players + 
+  transition_time(frameId) +  # animate based on frameId
+  ease_aes('linear') 
+
+```
+
+# display animation with proper Frames Per Second (FPS)
+```{r}
+total_frames <- length(unique(filtered_sanders_run_play$frameId))
+animate(animation_all_players, nframes = total_frames, fps = 25, duration = total_frames / 25)
+```
+
+# create an animation of Miles Sanders run play (only the runner)--------------------
+```{r}
+# filter play by play data for a specific play (only include sanders)
+filtered_sanders_coordinates <- tracking_week4  |> 
+  filter(
+    gameId==2022100209,
+    club == "PHI" | club == "JAX",
+    grepl("2022-10-02", time),
+    playId==2652, 
+    nflId =="47836"
+  ) |> 
+arrange(desc(s)) 
+
+filtered_sanders_coordinates
+```
+
+
+```{r}
+animation <- ggfootball(left_endzone = "#004C54", right_endzone = "#D7A22A", field_alpha = 0.7) +
+  # Plot the player's position over time as points
+  geom_point(data = filtered_sanders_coordinates, aes(x = x, y = y, color = s), size = 4) + 
+  # Add arrows for player orientation
+  geom_segment(data = filtered_sanders_coordinates, 
+               aes(x = x, y = y, 
+                   xend = x + cos(o * pi / 180) * 2,  # Adjust multiplier for arrow length
+                   yend = y + sin(o * pi / 180) * 2),  # Adjust multiplier for arrow length
+               arrow = arrow(type = "open", length = unit(0.1, "inches")), size = 0.5) +
+  # Set theme and limits for the plot
+  coord_fixed(xlim = c(0, 120), ylim = c(0, 53.3)) + 
+  labs(title = "Player Movement: Miles Sanders", x = "X Position (yards)", y = "Y Position (yards)") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+# Create the animation
+```{r}
+animation <- animation + 
+  transition_time(frameId) +  # Animate based on frameId (assuming frames are sequential)
+  ease_aes('linear')  # Smooth linear transition
+```
+
+
+# Display the animation with the correct frames per second
+```{r}
+animate(animation, nframes = nrow(filtered_sanders_coordinates), fps = 25)
+```
+
+
+#--------------------------
+
+# Get unique club names
+unique_clubs <- tracking_w_1 |> 
+  select(club) |> 
+  distinct()
+
+# View the unique club names
+print(unique_clubs)
+View(unique_clubs)
+
+
+# View the first few rows
+head(data)
+
+# other random EDA -------------------------------------------------
+# nflreadr::load_data()
+
+pbp <- load_participation(season = 2023, include_pbp = TRUE)
+View(pbp)
+
+pass_rush_epa <- pbp |>
+  filter (pass == 1) |> 
+  group_by(defteam) |> 
+  summarise(plays=n(),
+            avg_pass_rushers = round(mean(number_of_pass_rushers,na.rm=T),3),
+            epa = mean (epa, na.rm=T))
+
+ggplot2::ggplot(pass_rush_epa,aes(x=avg_pass_rushers, y=epa)) +
+  geom_mean_lines(aes(x0=avg_pass_rushers, y0= epa)) +
+  geom_nfl_logos(aes(team_abbr = defteam),width=0.055) + 
+  theme_classic()+
+  ggtitle("EPA/play on Average Amount of Pass Rushers",
+          "2023 Season Through Week 12") +
+  xlab('Average Amount of Pass Rushers') +
+  ylab('EPA/play') +
+  labs(caption = 'Data: nflreadr')
+
+participation <- load_participation(seasons = 2023)
+View(participation)
+
+rosters_2023 <- load_rosters(seasons = 2023)
+View(rosters_2023)
+
+pbp_2023 <- load_pbp(seasons = 2023)
+View(pbp_2023)
+
+schedules_2023 <- load_schedules(seasons = 2023)
+View(schedules_2023)
+
+snap_counts_2023 <- load_snap_counts(seasons = 2023)
+View(snap_counts)
+
+pbp_2020 <- nflreadr::load_pbp(2020) |> 
+  dplyr::filter(season_type == "REG") |>
+  dplyr::filter(!is.na(posteam) & (rush == 1 | pass == 1))
+
+offense <- pbp_2020  |>
+  dplyr::group_by(team = posteam) |>
+  dplyr::summarise(off_epa = mean(epa, na.rm = TRUE))
+
+defense <- pbp_2020  |>
+  dplyr::group_by(team = defteam) |>
+  dplyr::summarise(def_epa = mean(epa, na.rm = TRUE))
+
+combined <- offense |>
+  dplyr::inner_join(defense, by = "team")
+
+qbs <- pbp_2020  |>
+  dplyr::filter(pass == 1 | rush == 1) |>
+  dplyr::filter(down %in% 1:4) |>
+  dplyr::group_by(id) |>
+  dplyr::summarise(
+    name = dplyr::first(name),
+    team = dplyr::last(posteam),
+    plays = dplyr::n(),
+    qb_epa = mean(qb_epa, na.ram = TRUE)
+  ) |>
+  dplyr::filter(plays > 200) |>
+  dplyr::slice_max(qb_epa, n = 10)
+# ----------------
+# Logos in Scatter Plots
+ggplot2::ggplot(combined, aes(x = off_epa, y = def_epa)) +
+  ggplot2::geom_abline(slope = -1.5, intercept = seq(0.4, -0.3, -0.1), alpha = .2) +
+  nflplotR::geom_mean_lines(aes(x0 = off_epa , y0 = def_epa)) +
+  nflplotR::geom_nfl_logos(aes(team_abbr = team), width = 0.065, alpha = 0.7) +
+  ggplot2::labs(
+    x = "Offense EPA/play",
+    y = "Defense EPA/play",
+    caption = "Data: @nflfastR",
+    title = "2020 NFL Offensive and Defensive EPA per Play"
+  ) +
+  ggplot2::theme_minimal() +
+  ggplot2::theme(
+    plot.title = ggplot2::element_text(face = "bold"),
+    plot.title.position = "plot",
+    plot.background = ggplot2::element_rect(fill = "#F0F0F0")
+  ) +
+  ggplot2::scale_y_reverse()
+
