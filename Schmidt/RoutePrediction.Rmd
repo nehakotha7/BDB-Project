@@ -53,9 +53,9 @@ tracking_week8 <- read.csv("tracking_week_9.csv")
 player_play_w_info <- player_play |> 
   inner_join(plays, join_by(gameId, playId))
 
-# identify all players (by nflID) that play TE or WR 
-WR_TE <- players |> 
-  filter(position %in% c("WR", "TE")) |> 
+# identify all players (by nflID) that play WR 
+WR <- players |> 
+  filter(position == "WR") |> 
   distinct(nflId)
 ```
 
@@ -66,11 +66,11 @@ route_runners <- player_play |>
   drop_na(routeRan) |> 
   distinct(nflId)
 
-# identify which players were not WR or TE that ran a route 
-Non_WR_TE_route_runners <- anti_join(route_runners, WR_TE)
+# identify which players were not WR that ran a route 
+Non_WR_route_runners <- anti_join(route_runners, WR)
   
-# identify which positions ran routes that were not WR or TEs and how often - notice there are QB, FB, and RB as well
-left_join(Non_WR_TE_route_runners, players) |> 
+# identify which positions ran routes that were not WR and how often - notice there are QB, FB, TE, and RB as well
+left_join(Non_WR_route_runners, players) |> 
   count(position)
 
 # find out how many players play each position
@@ -78,15 +78,14 @@ players |>
   count(position)
 ```
 
-# Decided to focus on only WR and TE because if we are predicting routes, because before the play we won't know if a play is a run play or not so it is not relistic to try to predict routes of RB or FB
+# Decided to focus on only WR 
 ```{r}
-# Players WR & TE Positions - Include only position of each player, their name, and their NFLId
+# Players WR Positions - Include only position of each player, their name, and their NFLId
 positions <- players |> 
-  filter(position %in% c("WR", "TE")) |> 
+  filter(position == "WR") |> 
   select(nflId, displayName, position)
 
-# All play information of WRs and TEs that ran at least one route - there are 61,936
-
+# All play information of WRs that ran at least one route - there are 40,940
 plays_of_route_runners <- inner_join(player_play_w_info, positions)
 ```
 
@@ -99,10 +98,9 @@ plays_of_route_runners |>
   mutate(prop = occurances / sum(occurances)) 
 ```
 
-
 # Figuring out what some of the NAs could mean -------------------
 ```{r}
-# Plays where at least one receiver or tight end did not run a route - there are 8,319 plays
+# Plays where at least one receiver or tight end did not run a route - there are 6,874 plays
 no_route_ran <- plays_of_route_runners |> 
   filter(is.na(routeRan)) |> 
   distinct(gameId, playId)
@@ -119,28 +117,50 @@ deadplays
 ```
 
 ```{r}
-# removes kneeling and spike plays - now there are 8,131 plays
+# removes kneeling and spike plays - now there are 6,690 plays
 no_route_ran <- anti_join(no_route_ran, deadplays)
 
 no_route_ran
 
-# removes kneeling and spike plays from WR and TE play by play info
+# removes kneeling and spike plays from WR play by play info - there are now 40,690 observations
 
 plays_of_route_runners <- anti_join(plays_of_route_runners, deadplays, join_by(gameId, playId))
 
+plays_of_route_runners
+
+# remove QB sneaks from the data. This is okay to remove because QB sneaks are very predictable plays so the defense already knows the receiver isn't running a route. - There are still 40,438 reciever plays
+plays_of_route_runners <- plays_of_route_runners |> 
+  filter(is.na(qbSneak) | qbSneak == FALSE)
+
+# See how many plays now have NAs for routes ran - 15,393
 plays_of_route_runners |> 
-  filter(is.na(routeRan),
-         position == "WR")
+  filter(is.na(routeRan))
 
+# There are no plays that were blown dead because of penalty
 plays_of_route_runners |> 
-  filter(position == "WR",
-         is.na(routeRan)) |>
-  distinct(playDescription)
-
-
-  count(gameId, playId) |> 
-  count(n)
+  count(playNullifiedByPenalty)
 ```
+
+
+### Starting From Here Need To Redue. Did not finish  -----------------------
+```{r}
+phi_plays_w_WR_no_route <- plays_of_route_runners |> 
+  filter(possessionTeam == "PHI",
+         is.na(routeRan)) |> 
+  distinct(gameId, playId) 
+
+         
+#phi_WR_plays <- plays_of_route_runners |> 
+ # filter(possessionTeam == "PHI")
+
+#phi_WR_plays |> 
+ # inner_join(phi_plays_w_WR_no_route)
+  
+
+,
+         #is.na(passLength)) 
+```
+
 
 ```{r}
 # Filters the plays dataset to only include plays where no route was ran 
@@ -197,15 +217,6 @@ num_no_route_ran
   
 ```
 
-```{r}
-
-# there are 1,491 overall penalty plays and 579 of them have at least one WR or TE not running a route
-play_info_route_route_runners|> 
-  filter(#is.na(routeRan),
-         str_detect(playDescription, "PENALTY") | str_detect(playDescription, "Penalty"))# |> 
-  #drop_na(routeRan)
-  
-```
 
 # Multi-Logistic Regression To Classify Which Route A Reciever Will Run
 
