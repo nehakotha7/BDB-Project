@@ -1,0 +1,139 @@
+---
+title: "Route Prediction"
+author: "Belle Schmidt"
+date: "2024-11-19"
+output: html_document
+---
+
+```{r}
+# reading in the packages necessary
+library(nflverse)
+library(nflreadr)
+library(nflplotR)
+library(ggplot2)
+library(tidyverse)
+library(gganimate)
+library(dplyr)
+library(gganimate)
+library(ggfootball)
+```
+
+```{r}
+# gives me more information about the nflreadr package
+library(help = "nflreadr")
+```
+
+```{r}
+# reading in dataset
+games <- read.csv("games.csv")
+player_play <- read.csv("player_play.csv")
+players <- read.csv("players.csv")
+plays <- read.csv("plays.csv")
+```
+
+```{r}
+# reading in week by week tracking data
+tracking_week1 <- read.csv("tracking_week_1.csv")
+tracking_week2 <- read.csv("tracking_week_2.csv")
+tracking_week3 <- read.csv("tracking_week_3.csv")
+tracking_week4 <- read.csv("tracking_week_4.csv")
+tracking_week5 <- read.csv("tracking_week_5.csv")
+tracking_week6 <- read.csv("tracking_week_6.csv")
+tracking_week7 <- read.csv("tracking_week_7.csv")
+tracking_week8 <- read.csv("tracking_week_9.csv")
+```
+
+```{r}
+# Including play description in player play by play data
+players2 <- player_play |> 
+  inner_join(plays)
+
+# identify all players (by nflID) that play TE or WR 
+WR_TE <- players |> 
+  filter(position %in% c("WR", "TE")) |> 
+  distinct(nflId)
+
+# identify all players that ran at least one route
+route_runners <- player_play |> 
+  drop_na(routeRan) |> 
+  distinct(nflId)
+
+# identify which players were not WR or TE that ran a route
+Non_WR_TE_route_runners <- anti_join(route_runners, WR_TE)
+  
+# identify which positions ran routes that were not WR or TEs and how often
+left_join(Non_WR_TE_route_runners, players) |> 
+  count(position)
+
+# find out how many players play each position
+players |> 
+  count(position)
+
+# Players WR & TE Positions - Include only position of each player, their name, and their NFLId
+positions <- players |> 
+  filter(position %in% c("WR", "TE")) |> 
+  select(nflId, displayName, position)
+
+# All play information of WRs and TEs that ran at least one route - there are 61,936
+plays_of_route_runners <- inner_join(player_play, positions)
+
+plays_of_route_runners
+
+# The number of times and the proportion of the time each route is run by WR or TEs 
+plays_of_route_runners |> 
+  group_by(routeRan) |> 
+  summarise(occurances = n()) |> 
+  mutate(prop = occurances / sum(occurances)) # it is a little worrisome that so many routes are NAs. There is also a very large disproportion each route is run
+```
+
+```{r}
+# Plays where at least one receiver or tight end did not run a route - there are 8,319 plays
+no_route_ran <- plays_of_route_runners |> 
+  filter(is.na(routeRan)) |> 
+  distinct(gameId, playId)
+
+no_route_ran
+
+# the number of players who did not run a route on each play
+num_no_route_ran <- plays_of_route_runners |> 
+  filter(is.na(routeRan)) |> 
+  group_by(gameId, playId) |> 
+  summarise(players_no_route = n())
+
+num_no_route_ran
+```
+
+```{r}
+# Plays where the ball is spiked or the QB kneels - there are 188
+deadplays <- plays |> 
+  filter(is.na(offenseFormation))
+
+deadplays
+```
+
+```{r}
+# removes kneeling and spike plays - now there are 8,131 plays
+no_route_ran <- anti_join(no_route_ran, deadplays)
+
+no_route_ran
+```
+
+```{r}
+# Filters the plays dataset to only include plays where no route was ran 
+plays |> 
+  inner_join(no_route_ran)
+```
+
+```{r}
+# adds play information for all WR & TE play information rows
+play_info_route_route_runners <- plays_of_route_runners |> 
+  inner_join(plays, join_by(gameId, playId))
+
+
+# there are 1,491 overall penalty plays and 579 of them have at least one WR or TE not running a route
+play_info_route_route_runners|> 
+  filter(#is.na(routeRan),
+         str_detect(playDescription, "PENALTY") | str_detect(playDescription, "Penalty")) 
+  
+```
+
