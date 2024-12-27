@@ -5,6 +5,8 @@ date: "2024-11-19"
 output: html_document
 ---
 
+# Set Up ---------------------
+
 ```{r}
 # reading in the packages necessary
 library(nflverse)
@@ -43,49 +45,62 @@ tracking_week7 <- read.csv("tracking_week_7.csv")
 tracking_week8 <- read.csv("tracking_week_9.csv")
 ```
 
+# Determining What Plays To Include in Route Running Predicition ------------------
+
+# Setting up the data for more exploration
 ```{r}
-# Including play description in player play by play data
-players2 <- player_play |> 
-  inner_join(plays)
+# add play information to individual player play by play data
+player_play_w_info <- player_play |> 
+  inner_join(plays, join_by(gameId, playId))
 
 # identify all players (by nflID) that play TE or WR 
 WR_TE <- players |> 
   filter(position %in% c("WR", "TE")) |> 
   distinct(nflId)
+```
 
-# identify all players that ran at least one route
+# Finding out which positions other than WR & TE are running routes 
+```{r}
+# identify all players that ran at least one route 
 route_runners <- player_play |> 
   drop_na(routeRan) |> 
   distinct(nflId)
 
-# identify which players were not WR or TE that ran a route
+# identify which players were not WR or TE that ran a route 
 Non_WR_TE_route_runners <- anti_join(route_runners, WR_TE)
   
-# identify which positions ran routes that were not WR or TEs and how often
+# identify which positions ran routes that were not WR or TEs and how often - notice there are QB, FB, and RB as well
 left_join(Non_WR_TE_route_runners, players) |> 
   count(position)
 
 # find out how many players play each position
 players |> 
   count(position)
+```
 
+# Decided to focus on only WR and TE because if we are predicting routes, because before the play we won't know if a play is a run play or not so it is not relistic to try to predict routes of RB or FB
+```{r}
 # Players WR & TE Positions - Include only position of each player, their name, and their NFLId
 positions <- players |> 
   filter(position %in% c("WR", "TE")) |> 
   select(nflId, displayName, position)
 
 # All play information of WRs and TEs that ran at least one route - there are 61,936
-plays_of_route_runners <- inner_join(player_play, positions)
 
-plays_of_route_runners
+plays_of_route_runners <- inner_join(player_play_w_info, positions)
+```
 
+# Finding the distribution of the routes ran - it is a little worrisome that so many routes are NAs. There is also a very large disproportion each route is run
+```{r}
 # The number of times and the proportion of the time each route is run by WR or TEs 
 plays_of_route_runners |> 
   group_by(routeRan) |> 
   summarise(occurances = n()) |> 
-  mutate(prop = occurances / sum(occurances)) # it is a little worrisome that so many routes are NAs. There is also a very large disproportion each route is run
+  mutate(prop = occurances / sum(occurances)) 
 ```
 
+
+# Figuring out what some of the NAs could mean -------------------
 ```{r}
 # Plays where at least one receiver or tight end did not run a route - there are 8,319 plays
 no_route_ran <- plays_of_route_runners |> 
@@ -93,14 +108,6 @@ no_route_ran <- plays_of_route_runners |>
   distinct(gameId, playId)
 
 no_route_ran
-
-# the number of players who did not run a route on each play
-num_no_route_ran <- plays_of_route_runners |> 
-  filter(is.na(routeRan)) |> 
-  group_by(gameId, playId) |> 
-  summarise(players_no_route = n())
-
-num_no_route_ran
 ```
 
 ```{r}
@@ -116,24 +123,93 @@ deadplays
 no_route_ran <- anti_join(no_route_ran, deadplays)
 
 no_route_ran
+
+# removes kneeling and spike plays from WR and TE play by play info
+
+plays_of_route_runners <- anti_join(plays_of_route_runners, deadplays, join_by(gameId, playId))
+
+plays_of_route_runners |> 
+  filter(is.na(routeRan),
+         position == "WR")
+
+plays_of_route_runners |> 
+  filter(position == "WR",
+         is.na(routeRan)) |>
+  distinct(playDescription)
+
+
+  count(gameId, playId) |> 
+  count(n)
 ```
 
 ```{r}
 # Filters the plays dataset to only include plays where no route was ran 
-plays |> 
-  inner_join(no_route_ran)
+figure_out_nas <- plays |> 
+  inner_join(no_route_ran) 
+
+view(figure_out_nas)
+
+# 
+figure_out_nas |> 
+  count(passLength) |> 
+  arrange(passLength)
+
+plays_of_route_runners |> 
+  filter(is.na(passLength),
+         str_detect(playDescription, "sacked")) |> 
+  count(gameId, playId) |> 
+  count(n)
+
+# Number of occurences for each number of players that did not run a route, excluding pass plays  
+plays_of_route_runners |>
+  filter(!is.na(routeRan),
+         qbSneak == TRUE)
+
+
+plays_of_route_runners <- plays_of_route_runners |> 
+  filter(qbSneak == FALSE)
+
+plays_of_route_runners
+
+|> 
+  #filter(is.na(routeRan))
+         
+    
+  
+  
+  
+  filter(is.na(passLength), # most likely some sort of run play
+         is.na(routeRan))|>  # plays where no route was run
+  count(gameId, playId) |>  # the number of players that did not run a route on that play
+  count(n) |> # the number of plays where that many players didn't run a route
+  rename(num_players_no_route = n,
+         times_occurred = nn)
+  
+# the number of players who did not run a route on each play - including pass plays
+num_no_route_ran <- plays_of_route_runners |> 
+  filter(is.na(routeRan)) |> 
+  group_by(gameId, playId) |> 
+  summarise(players_no_route = n()) |> 
+  ungroup() |> 
+  count(players_no_route) # notice that all players with 4 or 5 players not running a route are run plays. Otherwise mostly pass plays. When 2 players didn't run the route thats pretty split
+
+num_no_route_ran
+  
 ```
 
 ```{r}
-# adds play information for all WR & TE play information rows
-play_info_route_route_runners <- plays_of_route_runners |> 
-  inner_join(plays, join_by(gameId, playId))
-
 
 # there are 1,491 overall penalty plays and 579 of them have at least one WR or TE not running a route
 play_info_route_route_runners|> 
   filter(#is.na(routeRan),
-         str_detect(playDescription, "PENALTY") | str_detect(playDescription, "Penalty")) 
+         str_detect(playDescription, "PENALTY") | str_detect(playDescription, "Penalty"))# |> 
+  #drop_na(routeRan)
   
+```
+
+# Multi-Logistic Regression To Classify Which Route A Reciever Will Run
+
+```{r}
+
 ```
 
