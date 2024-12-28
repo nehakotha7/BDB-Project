@@ -47,40 +47,14 @@ tracking_week8 <- read.csv("tracking_week_9.csv")
 
 # Determining What Plays To Include in Route Running Predicition ------------------
 
-# Setting up the data for more exploration
+## Setting up the data for more exploration
 ```{r}
 # add play information to individual player play by play data
 player_play_w_info <- player_play |> 
   inner_join(plays, join_by(gameId, playId))
-
-player_play
-
-# identify all players (by nflID) that play WR 
-WR <- players |> 
-  filter(position == "WR") |> 
-  distinct(nflId)
 ```
 
-# Finding out which positions other than WR are running routes 
-```{r}
-# identify all players that ran at least one route 
-route_runners <- player_play |> 
-  drop_na(routeRan) |> 
-  distinct(nflId)
-
-# identify which players were not WR that ran a route 
-Non_WR_route_runners <- anti_join(route_runners, WR)
-  
-# identify which positions ran routes that were not WR and how often - notice there are QB, FB, TE, and RB as well
-left_join(Non_WR_route_runners, players) |> 
-  count(position)
-
-# find out how many players play each position
-players |> 
-  count(position)
-```
-
-# Decided to focus on only WR 
+## Decided to focus on only WR 
 ```{r}
 # Players WR Positions - Include only position of each player, their name, and their NFLId
 positions <- players |> 
@@ -91,7 +65,7 @@ positions <- players |>
 plays_of_route_runners <- inner_join(player_play_w_info, positions)
 ```
 
-# Finding the distribution of the routes ran - it is a little worrisome that so many routes are NAs. There is also a very large disproportion each route is run
+## Finding the distribution of the routes ran - it is a little worrisome that so many routes are NAs. There is also a very large disproportion each route is run
 ```{r}
 # The number of times and the proportion of the time each route is run by WR or TEs 
 plays_of_route_runners |> 
@@ -101,37 +75,30 @@ plays_of_route_runners |>
 ```
 
 # Figuring out what some of the NAs could mean -------------------
+
 ```{r}
 # Plays where at least one receiver or tight end did not run a route - there are 6,874 plays
 no_route_ran <- plays_of_route_runners |> 
   filter(is.na(routeRan)) |> 
   distinct(gameId, playId)
-
-no_route_ran
 ```
 
-
-### Removing Deadplays
+## Removing Deadplays
 ```{r}
 # Plays where the ball is spiked or the QB kneels - there are 188
 deadplays <- plays |> 
   filter(is.na(offenseFormation))
 
-deadplays
-
 # removes kneeling and spike plays - now there are 6,690 plays
 no_route_ran <- anti_join(no_route_ran, deadplays)
 
-no_route_ran
 
 # removes kneeling and spike plays from WR play by play info - there are now 40,690 observations
 
 plays_of_route_runners <- anti_join(plays_of_route_runners, deadplays, join_by(gameId, playId))
-
-plays_of_route_runners
 ```
 
-### Removing QB Sneaks
+## Removing QB Sneaks
 ```{r}
 # remove QB sneaks from the data. This is okay to remove because QB sneaks are very predictable plays so the defense already knows the receiver isn't running a route. - There are still 40,438 reciever plays
 plays_of_route_runners <- plays_of_route_runners |> 
@@ -141,38 +108,23 @@ plays_of_route_runners <- plays_of_route_runners |>
 valid_plays <- plays_of_route_runners |> 
   distinct(gameId, playId)
 
-
 # Remove QB sneaks from the list of plays where at least one WR with an NA route - 6,571 plays
 no_route_ran <- no_route_ran|> 
   inner_join(valid_plays)
 
-no_route_ran
-
 ```
 
-### Exploring the NAs left
-```{r}
-# See how many plays now have NAs for routes ran - 15,393
-plays_of_route_runners |> 
-  filter(is.na(routeRan))
-
-# There are no plays that were blown dead because of penalty
-plays_of_route_runners |> 
-  count(playNullifiedByPenalty)
-```
-
-# Replacing NAs with saying no route ran - 
+## Replacing NAs with saying no route ran - 
 ```{r}
 plays_of_route_runners <- plays_of_route_runners |> 
   mutate(routeRan = replace_na(routeRan, "NO ROUTE"))
 ```
 
+# Exploratory Data Analysis --------------------------------------------------------
 
-# Exploratory Data Analysis ----------------------
+## Distribution of Variables ------------------------------------
 
-## Distribution of Variables ---------------------
-
-### Routes Ran
+### Routes Ran -----------------
 
 ```{r}
 # The number of times and the proportion of the time each route is run by WR
@@ -198,7 +150,7 @@ plays_of_route_runners |>
   )
 ```
 
-# Defining the Different Routes ------------
+#### Defining the Different Routes 
 **Wheel:** When the reciever runs kind of an L shaped path. Out and then down field - most commonly run by RB
 
 **Angle:** when the player cuts out 45 degrees and then takes a 90 degree turn and cuts back in (often RB, FB, or TE) - makes sense why few WR run it
@@ -223,7 +175,7 @@ plays_of_route_runners |>
 
 **Go:** When the wide receiver runs straight down field as fast as they can
 
-### Formations 
+### Formations ------------------------
 
 ```{r}
 # The number of times and the proportion of the time each formation is used
@@ -249,6 +201,8 @@ plays_of_route_runners |>
   )
 ```
 
+#### Defining the Different Formations
+
 **Shotgun:** When the quarterback is several yards back from the center and has more time to read the defense. In this case, when the ball is snapped, the quarterback is not grabbing it directly from the center.
 
 **Single back:** When the quarterback is under center (grabs the ball directly from the center) and there is a single RB about 5 yards back
@@ -261,49 +215,8 @@ plays_of_route_runners |>
 
 **Jumbo:** when an offensive lineup is designed for maximum blocking power (often close to goal line). Normally sub a receiver for an extra TE.
 
-#### Exploring Jumbo ------------------------------
-```{r}
 
-# filtering for plays where the formation was Jumbo
-jumbo <- plays_of_route_runners |> 
-  filter(offenseFormation == "JUMBO"
-         ) |> 
-  distinct(gameId, playId)
-
-jumbo
-
-# answered questions like - (1) are plays with off formation jumbo always runs (no) (2) how often in the jumbo formation do receivers run routes (3) how often do receivers block on jumbo plays
-plays_of_route_runners |> 
-  inner_join(jumbo) |> 
-  filter(!is.na(passLength)) |> 
-  #filter(routeRan != "NO ROUTE") |> 
-  #filter(is.na(blockedPlayerNFLId1)) |> 
-  #count(gameId, playId) |> 
-  #count(n)
-
-```
-
-#### Exploring Wildcat ------------------------------
-```{r}
-
-# filtering for plays where the formation was Jumbo
-wildcat <- plays_of_route_runners |> 
-  filter(offenseFormation == "WILDCAT"
-         ) |> 
-  distinct(gameId, playId)
-
-wildcat
-
-# how many WR do not run routes when in the wildcat formation - since most don't & this is a really unique play, maybe we remove it? 
-plays_of_route_runners |> 
-  inner_join(wildcat) |> 
-  filter(routeRan == "NO ROUTE") |> 
-  count(gameId, playId) |> 
-  count(n)
-
-```
-
-### Receiver Alignment
+### Receiver Alignment ---------------------------
 
 ```{r}
 # The number of times and the proportion of the time each receiver alignment is used
@@ -328,24 +241,59 @@ plays_of_route_runners |>
   )
 ```
 
-### Motion
+### Motion ---------------------------------------
 
+#### Motion from the line of scrimmage -------------
+
+##### WR that motioned from the line of scrimmage (excludes players that were not set at the line)
 ```{r}
-# Making motion easier to work with
-motion <- plays_of_route_runners |> 
-  mutate(inMotionAtBallSnap = ifelse(inMotionAtBallSnap == TRUE, 1, 0),
-         inMotionAtBallSnap = replace_na(inMotionAtBallSnap, 0))
+set_at_line <- plays_of_route_runners |> 
+  mutate(motionSinceLineset = ifelse(motionSinceLineset == TRUE, 1, 0)) |>
+  drop_na(motionSinceLineset) # removes players that were not set at the line of scrimmage
 
-# the proportion of the time each player motions
-player_prop_motion <- motion|> 
+# the proportion of the times each player motioned when they were set at the line
+player_prop_motion_from_line <- set_at_line|> 
   group_by(displayName) |> 
-  summarise(propInMotion = round(mean(inMotionAtBallSnap), 3)) |> 
-  arrange(propInMotion)
+  summarise(prop_in_motion_from_line = round(mean(motionSinceLineset), 3)) |> 
+  arrange(prop_in_motion_from_line)
 
-player_prop_motion
+player_prop_motion_from_line
+```
+
+##### Teams motioning players from line of scrimmage
+```{r}
+# the proportion of the times each player motioned when they were set at the line
+team_prop_motion_from_line <- set_at_line|> 
+  group_by(possessionTeam) |> 
+  summarise(prop_in_motion_from_line = round(mean(motionSinceLineset), 3)) |> 
+  arrange(prop_in_motion_from_line)
+
+team_prop_motion_from_line
+```
 
 
-# proportion of the time that each team motions
+#### Motion and stay in motion at snap ------------------------
+
+##### WR that were still in motion at snap if they motioned at some point (excludes players that were not in motion prior to snap)
+```{r}
+# All plays where a WR was in motion at some point
+motion <- plays_of_route_runners |> 
+  mutate(inMotionAtBallSnap = ifelse(inMotionAtBallSnap == TRUE, 1, 0)) |> 
+  drop_na(inMotionAtBallSnap) # NAs represent players that never motioned at all
+
+# the proportion of the time each player is still in motion at snap when they previously motioned
+player_prop_still_motion_at_snap <- motion|> 
+  group_by(displayName) |> 
+  summarise(prop_still_motion_at_snap = round(mean(inMotionAtBallSnap), 3)) |> 
+  arrange(prop_still_motion_at_snap)
+
+player_prop_still_motion_at_snap
+
+```
+
+##### Teams motioning players and keeping them in motion at snap
+```{r}
+# table of proportion of the time that each team motions and keeps player in motion at snap
 team_prop_motion <- motion|> 
   group_by(possessionTeam) |> 
   summarise(propInMotion = round(mean(inMotionAtBallSnap), 3)) |> 
@@ -355,7 +303,7 @@ team_prop_motion
 ```
 
 ```{r, fig.cap="The distribution is relatively even. MIA motions A LOT though. PHI and NE seem to motion less.}
-# Distribution of Receiver Alignment - fix this so each team is represented by their team colors
+# Visualization of proportion of the time that each team motions and keeps player in motion at snap - fix this so each team is represented by their team colors
 
 team_prop_motion |> 
   ggplot(aes(x = possessionTeam, y = propInMotion, fill = possessionTeam)) +
@@ -363,24 +311,138 @@ team_prop_motion |>
   theme_bw() +
   theme(axis.text.x = element_text(size = 8.5, angle = 90), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 12), axis.text = element_text(face = "bold")) +
   labs(
-    title = "Proportion of Plays Each NFL Team Motions",
+    title = "Proportion of Players Each NFL Team Motions & Keeps In Motion At Snap ",
     x = "NFL Team",
-    y = "Proportion of Plays Motioned"
+    y = "Prop of Players That Motion And Stay in Motion Per Team"
   )
 ```
+
+
+# Appendix ----------------------------------------------------------------------------
+
+# Identifying which player position to focus on in our analysis --------------------------
+
+```{r}
+# identify all players (by nflID) that play WR 
+WR <- players |> 
+  filter(position == "WR") |> 
+  distinct(nflId)
+
+# identify all players that ran at least one route 
+route_runners <- player_play |> 
+  drop_na(routeRan) |> 
+  distinct(nflId)
+
+# identify which players were not WR that ran a route 
+Non_WR_route_runners <- anti_join(route_runners, WR)
+  
+# identify which positions ran routes that were not WR and how often - notice there are QB, FB, TE, and RB as well
+left_join(Non_WR_route_runners, players) |> 
+  count(position)
+
+# find out how many players play each position
+players |> 
+  count(position)
+```
+
+# Exploring the NAs left ------------------------------- 
+
+```{r}
+# See how many plays now have NAs for routes ran - 15,393
+plays_of_route_runners |> 
+  filter(routeRan == "NO ROUTE")
+
+# There are no plays that were blown dead because of penalty
+plays_of_route_runners |> 
+  count(playNullifiedByPenalty)
+```
+
+## Figuring out when they might be blocking
+
+```{r}
+# All plays where the WR blocked a player- on 11 of them the WR still ran a route
+plays_of_route_runners |> 
+  filter(!is.na(blockedPlayerNFLId1))
+```
+
+```{r}
+# Find out which routes have at least one WR that ran that route and one WR that did not run a route - makes sense that screen is one of the highest 
+plays_of_route_runners |> 
+  inner_join(no_route_ran) |> 
+  filter(routeRan != "NO ROUTE") |> 
+  count(routeRan)
+```
+
+## Identifying receivers the did not run routes when screen route was run
+```{r}
+screen_plays <- plays_of_route_runners |> 
+  filter(routeRan == "SCREEN") |> 
+  distinct(gameId, playId)
+
+plays_of_route_runners |> 
+  inner_join(screen_plays)|> 
+  filter(routeRan == "NO ROUTE")|> 
+  group_by(gameId, playId) |> 
+  summarise(num_receivers_no_route = n()) |> 
+  ungroup() |> 
+  count(num_receivers_no_route)
+```
+
+## Figuring out if receivers are running routes on sacks
 ```{r}
 plays_of_route_runners |> 
-  ggplot(aes(x = inMotionAtBallSnap, fill = inMotionAtBallSnap)) +
-  geom_bar() +
-  theme_bw() +
-  theme(axis.text.x = element_text(size = 8.5, angle = 90), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 12), axis.text = element_text(face = "bold")) +
-  labs(
-    title = "Distribution of Players In Motion At Snap",
-    x = "Motion At Snap",
-    y = "Number of Players"
-  )
-  
+  filter(passResult == "S") |> 
+  count(routeRan)
 ```
+
+# Exploring Formations ------------------------------
+
+## Jumbo 
+```{r}
+
+# filtering for plays where the formation was Jumbo
+jumbo <- plays_of_route_runners |> 
+  filter(offenseFormation == "JUMBO"
+         ) |> 
+  distinct(gameId, playId)
+
+jumbo
+
+# answered questions like - (1) are plays with off formation jumbo always runs (no) (2) how often in the jumbo formation do receivers run routes (3) how often do receivers block on jumbo plays
+plays_of_route_runners |> 
+  inner_join(jumbo) |> 
+  filter(!is.na(passLength)) |> 
+  #filter(routeRan != "NO ROUTE") |> 
+  #filter(is.na(blockedPlayerNFLId1)) |> 
+  #count(gameId, playId) |> 
+  #count(n)
+
+```
+
+## Wildcat
+```{r}
+
+# filtering for plays where the formation was wildcat
+wildcat <- plays_of_route_runners |> 
+  filter(offenseFormation == "WILDCAT"
+         ) |> 
+  distinct(gameId, playId)
+
+wildcat
+
+# how many WR do not run routes when in the wildcat formation - can not remove wildcats because receivers are still running routes
+plays_of_route_runners |> 
+  inner_join(wildcat) |> 
+  filter(routeRan != "NO ROUTE") |> 
+  count(gameId, playId) |> 
+  count(n) |> 
+  rename(num_receivers = n,
+         num_occurrences = nn)
+
+```
+
+# Figuring Out Differences / Relationships Between `motionSinceLineset` & `inMotionAtBallSnap` ------------
+
 ```{r}
 plays_of_route_runners |> 
   count(inMotionAtBallSnap)
@@ -395,173 +457,3 @@ plays_of_route_runners |>
   count(shiftSinceLineset)
 
 ```
-
-
-
-# Work That Will Not Be Used ---------------------------------------------------------
-
-# Figuring Out When They Might Be Blocking ----------------------
-
-```{r}
-# All plays where the WR blocked a player- on 11 of them the WR still ran a route
-plays_of_route_runners |> 
-  filter(!is.na(blockedPlayerNFLId1))
-
-
-### Finding out what happened when blocker ran corner route ----------------
-
-# identifying the play where the blocker ran a corner route
-corner_blocker <- plays_of_route_runners |> 
-  filter(!is.na(blockedPlayerNFLId1),
-         routeRan == "CORNER"
-         ) |> 
-  distinct(gameId, playId)
-
-# find out what is happening on the play where he ran a corner route and blocked - how can he block, run a corner route and have the ball passed to him ? 
-plays_of_route_runners |> 
-  inner_join(corner_blocker)
-
-# seeing all TE and WR involved in the play
-player_play_w_info |> 
-  inner_join(corner_blocker) |> 
-  inner_join(players, join_by(nflId))|> 
-  filter(position %in% c("TE", "WR")) |> 
-  select(gameId, playId, displayName, blockedPlayerNFLId1)
-```
-
-```{r}
-# Find out which plays have at least one WR that ran a route and one WR that did not run a route - makes sense thatscreen is one of the highest 
-plays_of_route_runners |> 
-  inner_join(no_route_ran) |> 
-  drop_na(routeRan) |> 
-  count(routeRan)
-  
-```
-
-```{r}
-plays_of_route_runners |> 
-  count(routeRan)
-  
-  drop_na(routeRan) |> 
-  count(gameId, playId, routeRan) |> 
-  filter(routeRan == "JUMBO") |> 
-  count(n)
-
-
-screen_plays <- plays_of_route_runners |> 
-  filter(routeRan == "SCREEN") |> 
-  distinct(gameId, playId)
-
-plays_of_route_runners |> 
-  inner_join(screen_plays) |> 
-  filter(is.na(routeRan))
-```
-
-
-### Exploring the Philedelphia Eagles ----------------------- COME BACK AND PICK A TEAM AFTER EDA
-```{r}
-
-# all plays where Philadelphia eagles - there are 1,279 wr play information rows
-phi_WR_plays <- plays_of_route_runners |> 
-  filter(possessionTeam == "PHI")
-
-phi_WR_plays
-
-
-# In 598 of the plays with information for WR, the WR did not run a route
-phi_WR_plays |> 
-  filter(is.na(routeRan)) 
-  
-# All 598 of the plays where the receiver did not run a route did not have a pass thrown
-phi_WR_plays |> 
-  filter(is.na(routeRan),
-         is.na(passLength)) 
-  
-# The number of WR involved in each non pass play and how many times that number of WR were involved
-phi_WR_plays |> 
-  filter(is.na(passLength)) |> 
-  count(gameId, playId) |> 
-  count(n) |> 
-  rename(num_players = n,
-         num_occurences = nn)
-
-# The number of players who did not run a route on a play and how many times that many players didn't run a route
-phi_WR_plays |> 
-  filter(is.na(routeRan)) |> 
-  count(gameId, playId) |> 
-  count(n) |> 
-  rename(num_players = n,
-         num_occurences = nn)
-  
-plays_w_one <- phi_WR_plays |> 
-  filter(is.na(passLength)) |> 
-  count(gameId, playId) |> 
-  filter(n == 1)
-
-phi_WR_plays 
-
-```
-
-
-```{r}
-# Filters the plays dataset to only include plays where no route was ran 
-figure_out_nas <- plays |> 
-  inner_join(no_route_ran) 
-
-view(figure_out_nas)
-
-# 
-figure_out_nas |> 
-  count(passLength) |> 
-  arrange(passLength)
-
-plays_of_route_runners |> 
-  filter(is.na(passLength),
-         str_detect(playDescription, "sacked")) |> 
-  count(gameId, playId) |> 
-  count(n)
-
-# Number of occurences for each number of players that did not run a route, excluding pass plays  
-plays_of_route_runners |>
-  filter(!is.na(routeRan),
-         qbSneak == TRUE)
-
-
-plays_of_route_runners <- plays_of_route_runners |> 
-  filter(qbSneak == FALSE)
-
-plays_of_route_runners
-
-|> 
-  #filter(is.na(routeRan))
-         
-    
-  
-  
-  
-  filter(is.na(passLength), # most likely some sort of run play
-         is.na(routeRan))|>  # plays where no route was run
-  count(gameId, playId) |>  # the number of players that did not run a route on that play
-  count(n) |> # the number of plays where that many players didn't run a route
-  rename(num_players_no_route = n,
-         times_occurred = nn)
-  
-# the number of players who did not run a route on each play - including pass plays
-num_no_route_ran <- plays_of_route_runners |> 
-  filter(is.na(routeRan)) |> 
-  group_by(gameId, playId) |> 
-  summarise(players_no_route = n()) |> 
-  ungroup() |> 
-  count(players_no_route) # notice that all players with 4 or 5 players not running a route are run plays. Otherwise mostly pass plays. When 2 players didn't run the route thats pretty split
-
-num_no_route_ran
-  
-```
-
-
-# Multi-Logistic Regression To Classify Which Route A Reciever Will Run
-
-```{r}
-
-```
-
