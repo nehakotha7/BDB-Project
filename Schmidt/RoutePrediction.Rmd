@@ -132,6 +132,20 @@ plays_of_route_runners
 plays_of_route_runners <- plays_of_route_runners |> 
   filter(is.na(qbSneak) | qbSneak == FALSE)
 
+# Creating a list of plays where qb sneaks are not included
+valid_plays <- plays_of_route_runners |> 
+  distinct(gameId, playId)
+
+
+# Remove QB sneaks from the list of plays where at least one WR with an NA route - 6,571 plays
+no_route_ran <- no_route_ran|> 
+  inner_join(valid_plays)
+
+no_route_ran
+
+```
+
+```{r}
 # See how many plays now have NAs for routes ran - 15,393
 plays_of_route_runners |> 
   filter(is.na(routeRan))
@@ -141,24 +155,315 @@ plays_of_route_runners |>
   count(playNullifiedByPenalty)
 ```
 
-
-### Starting From Here Need To Redue. Did not finish  -----------------------
+# Replacing NAs with saying no route ran - do we want to change this so people who blocked someone it says block. And the rest say NO ROUTE?
 ```{r}
-phi_plays_w_WR_no_route <- plays_of_route_runners |> 
-  filter(possessionTeam == "PHI",
-         is.na(routeRan)) |> 
-  distinct(gameId, playId) 
+plays_of_route_runners <- plays_of_route_runners |> 
+  mutate(routeRan = replace_na(routeRan, "NO ROUTE"))
+```
 
-         
-#phi_WR_plays <- plays_of_route_runners |> 
- # filter(possessionTeam == "PHI")
 
-#phi_WR_plays |> 
- # inner_join(phi_plays_w_WR_no_route)
+# Exploratory Data Analysis ----------------------
+
+## Distribution of Variables ---------------------
+
+### Routes Ran
+
+```{r}
+# The number of times and the proportion of the time each route is run by WR
+plays_of_route_runners |> 
+  group_by(routeRan) |> 
+  summarise(occurances = n()) |> 
+  mutate(prop = occurances / sum(occurances)) 
+```
+
+
+```{r, fig.cap= "There is a very large disproportion of the number of times each route is ran. Specifically a lot of the time receivers ran no route."}
+# Distribution of routes ran
+
+plays_of_route_runners |> 
+  ggplot(aes(x = fct_rev(fct_infreq(routeRan)), fill = routeRan)) +
+  geom_bar() +
+  theme_bw() +
+  theme(axis.text.x = element_text(size = 8.5), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 12), axis.text = element_text(face = "bold")) +
+  labs(
+    title = "Distribution of Routes Ran By Wide Recievers",
+    x = "Route Ran",
+    y = "Number of Times That Route Was Ran"
+  )
+```
+
+# Defining the Different Routes ------------
+**Wheel:** When the reciever runs kind of an L shaped path. Out and then down field - most commonly run by RB
+
+**Angle:** when the player cuts out 45 degrees and then takes a 90 degree turn and cuts back in (often RB, FB, or TE) - makes sense why few WR run it
+
+**Screen:** Various types. More of a basic screen is where RB catches ball and lineman block. Then Jailbreak screen is where the receiver out wide is the target. Two receivers and a lineman are blockers. Bubble screen is where WR drops back slightly and two recievers block. Drop back screen looks like drop back pass but one WR runs route and other WR block. Could be TE too? 
+
+**Flat:** when the receiver runs a quick short route straight then towards the sideline
+
+**Corner:** when the receiver runs down the field and then turns outward 45degrees (opposite direction of post)
+
+**Slant:** when the receiver runs shortly straight and then turns inward 45 degrees (like short version of post)
+
+**Post:** when the receiver runs 10 to 20 yards down field and then turns 45 degrees and runs towards the goal posts 
+
+**Out:** when the receiver runs down the field and then cuts out and runs parallel to the line of scrimmage
+
+**In:** when the receiver runs down the field and then cuts in and runs parallel to the line of scrimmage
+
+**Cross:** when the receiver crosses across the field
+
+**Hitch:** when the receiver runs a set number of yards (normally 5 to 6) and then turns to face the QB 
+
+**Go:** When the wide receiver runs straight down field as fast as they can
+
+### Formations 
+
+```{r}
+# The number of times and the proportion of the time each formation is used
+plays_of_route_runners |> 
+  group_by(offenseFormation) |> 
+  summarise(occurances = n()) |> 
+  mutate(prop = occurances / sum(occurances)) 
+```
+
+
+```{r}
+# Distribution of Formations 
+
+plays_of_route_runners |> 
+  ggplot(aes(x = fct_rev(fct_infreq(offenseFormation)), fill = offenseFormation)) +
+  geom_bar() +
+  theme_bw() +
+  theme(axis.text.x = element_text(size = 8.5), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 12), axis.text = element_text(face = "bold")) +
+  labs(
+    title = "Distribution of Formation Usage",
+    x = "Formation",
+    y = "Number of Times That Formation Was Used"
+  )
+```
+
+**Shotgun:** When the quarterback is several yards back from the center and has more time to read the defense. In this case, when the ball is snapped, the quarterback is not grabbing it directly from the center.
+
+**Single back:** When the quarterback is under center (grabs the ball directly from the center) and there is a single RB about 5 yards back
+
+**Empty:** When there are no backs in the backfield so the quarterback is the only player in the backfield
+
+**Pistol:** When the quarterback is a couple yards behind the center (closer than for shotgun though) and there is a running back right behind him
+
+**Wildcat:** when the ball is snapped to a position player other than the QB... might want to remove these
+
+**Jumbo:** when an offensive lineup is designed for maximum blocking power (often close to goal line). Normally sub a receiver for an extra TE.
+
+#### Exploring Jumbo ------------------------------
+```{r}
+
+# filtering for plays where the formation was Jumbo
+jumbo <- plays_of_route_runners |> 
+  filter(offenseFormation == "JUMBO"
+         ) |> 
+  distinct(gameId, playId)
+
+jumbo
+
+# answered questions like - (1) are plays with off formation jumbo always runs (no) (2) how often in the jumbo formation do recievers run routes (3) how often do receivers block on jumbo plays
+plays_of_route_runners |> 
+  inner_join(jumbo) |> 
+  filter(!is.na(passLength)) |> 
+  #filter(routeRan != "NO ROUTE") |> 
+  #filter(is.na(blockedPlayerNFLId1)) |> 
+  #count(gameId, playId) |> 
+  #count(n)
+
+```
+
+#### Exploring Wildcat ------------------------------
+```{r}
+
+# filtering for plays where the formation was Jumbo
+wildcat <- plays_of_route_runners |> 
+  filter(offenseFormation == "WILDCAT"
+         ) |> 
+  distinct(gameId, playId)
+
+wildcat
+
+# how many WR do not run routes when in the wildcat formation - since most don't & this is a really unique play, maybe we remove it? 
+plays_of_route_runners |> 
+  inner_join(wildcat) |> 
+  filter(routeRan == "NO ROUTE") |> 
+  count(gameId, playId) |> 
+  count(n)
+
+```
+
+### Receiver Alignment
+
+```{r}
+# The number of times and the proportion of the time each receiver alignment is used
+plays_of_route_runners |> 
+  group_by(receiverAlignment) |> 
+  summarise(occurances = n()) |> 
+  mutate(prop = occurances / sum(occurances)) 
+```
+
+```{r}
+# Distribution of Receiver Alignment 
+
+plays_of_route_runners |> 
+  ggplot(aes(x = fct_rev(fct_infreq(receiverAlignment)), fill = receiverAlignment)) +
+  geom_bar() +
+  theme_bw() +
+  theme(axis.text.x = element_text(size = 8.5), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 12), axis.text = element_text(face = "bold")) +
+  labs(
+    title = "Distribution of Receiver Alignment Usage",
+    x = "Receiver Alignment",
+    y = "Number of Times That Receiver Alignment Was Used"
+  )
+```
+
+### Motion
+
+```{r}
+# Making motion easier to work with
+motion <- plays_of_route_runners |> 
+  mutate(inMotionAtBallSnap = ifelse(inMotionAtBallSnap == TRUE, 1, 0),
+         inMotionAtBallSnap = replace_na(inMotionAtBallSnap, 0))
+
+# the proportion of the time each player motions
+player_prop_motion <- motion|> 
+  group_by(displayName) |> 
+  summarise(propInMotion = round(mean(inMotionAtBallSnap), 3)) |> 
+  arrange(propInMotion)
+
+player_prop_motion
+
+
+# proportion of the time that each team motions
+team_prop_motion <- motion|> 
+  group_by(possessionTeam) |> 
+  summarise(propInMotion = round(mean(inMotionAtBallSnap), 3)) |> 
+  arrange(propInMotion)
+
+team_prop_motion
+```
+
+```{r, fig.cap="The distribution is relatively even. MIA motions A LOT though. PHI and NE seem to motion less.}
+# Distribution of Receiver Alignment - fix this so each team is represented by their team colors
+
+team_prop_motion |> 
+  ggplot(aes(x = possessionTeam, y = propInMotion, fill = possessionTeam)) +
+  geom_bar(stat = "identity") +
+  theme_bw() +
+  theme(axis.text.x = element_text(size = 8.5, angle = 90), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 12), axis.text = element_text(face = "bold")) +
+  labs(
+    title = "Proportion of Plays Each NFL Team Motions",
+    x = "NFL Team",
+    y = "Proportion of Plays Motioned"
+  )
+```
+
+# Work That Will Not Be Used ---------------------------------------------------------
+
+# Figuring Out When They Might Be Blocking ----------------------
+```{r}
+# All plays where the WR blocked a player- on 11 of them the WR still ran a route
+plays_of_route_runners |> 
+  filter(!is.na(blockedPlayerNFLId1))
+
+
+### Finding out what happened when blocker ran corner route ----------------
+
+# identifying the play where the blocker ran a corner route
+corner_blocker <- plays_of_route_runners |> 
+  filter(!is.na(blockedPlayerNFLId1),
+         routeRan == "CORNER"
+         ) |> 
+  distinct(gameId, playId)
+
+# find out what is happening on the play where he ran a corner route and blocked - how can he block, run a corner route and have the ball passed to him ? 
+plays_of_route_runners |> 
+  inner_join(corner_blocker)
+
+# seeing all TE and WR involved in the play
+player_play_w_info |> 
+  inner_join(corner_blocker) |> 
+  inner_join(players, join_by(nflId))|> 
+  filter(position %in% c("TE", "WR")) |> 
+  select(gameId, playId, displayName, blockedPlayerNFLId1)
+```
+
+```{r}
+# Find out which plays have at least one WR that ran a route and one WR that did not run a route - makes sense thatscreen is one of the highest 
+plays_of_route_runners |> 
+  inner_join(no_route_ran) |> 
+  drop_na(routeRan) |> 
+  count(routeRan)
   
+```
 
-,
-         #is.na(passLength)) 
+```{r}
+plays_of_route_runners |> 
+  count(routeRan)
+  
+  drop_na(routeRan) |> 
+  count(gameId, playId, routeRan) |> 
+  filter(routeRan == "JUMBO") |> 
+  count(n)
+
+
+screen_plays <- plays_of_route_runners |> 
+  filter(routeRan == "SCREEN") |> 
+  distinct(gameId, playId)
+
+plays_of_route_runners |> 
+  inner_join(screen_plays) |> 
+  filter(is.na(routeRan))
+```
+
+
+### Exploring the Philedelphia Eagles ----------------------- COME BACK AND PICK A TEAM AFTER EDA
+```{r}
+
+# all plays where Philadelphia eagles - there are 1,279 wr play information rows
+phi_WR_plays <- plays_of_route_runners |> 
+  filter(possessionTeam == "PHI")
+
+phi_WR_plays
+
+
+# In 598 of the plays with information for WR, the WR did not run a route
+phi_WR_plays |> 
+  filter(is.na(routeRan)) 
+  
+# All 598 of the plays where the receiver did not run a route did not have a pass thrown
+phi_WR_plays |> 
+  filter(is.na(routeRan),
+         is.na(passLength)) 
+  
+# The number of WR involved in each non pass play and how many times that number of WR were involved
+phi_WR_plays |> 
+  filter(is.na(passLength)) |> 
+  count(gameId, playId) |> 
+  count(n) |> 
+  rename(num_players = n,
+         num_occurences = nn)
+
+# The number of players who did not run a route on a play and how many times that many players didn't run a route
+phi_WR_plays |> 
+  filter(is.na(routeRan)) |> 
+  count(gameId, playId) |> 
+  count(n) |> 
+  rename(num_players = n,
+         num_occurences = nn)
+  
+plays_w_one <- phi_WR_plays |> 
+  filter(is.na(passLength)) |> 
+  count(gameId, playId) |> 
+  filter(n == 1)
+
+phi_WR_plays 
+
 ```
 
 
