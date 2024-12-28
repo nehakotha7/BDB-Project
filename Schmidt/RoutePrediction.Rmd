@@ -114,7 +114,7 @@ no_route_ran <- no_route_ran|>
 
 ```
 
-## Replacing NAs with saying no route ran - 
+## Replacing NAs with saying no route ran 
 ```{r}
 plays_of_route_runners <- plays_of_route_runners |> 
   mutate(routeRan = replace_na(routeRan, "NO ROUTE"))
@@ -127,26 +127,26 @@ plays_of_route_runners <- plays_of_route_runners |>
 ### Routes Ran -----------------
 
 ```{r}
-# The number of times and the proportion of the time each route is run by WR
-plays_of_route_runners |> 
+# The number of times and the proportion of the time each route is run by WR (Table)
+prop_route <- plays_of_route_runners |> 
   group_by(routeRan) |> 
   summarise(occurances = n()) |> 
   mutate(prop = occurances / sum(occurances)) 
 ```
 
 
-```{r, fig.cap= "There is a very large disproportion of the number of times each route is ran. Specifically a lot of the time receivers ran no route."}
-# Distribution of routes ran
+```{r, fig.cap= "There is a very large disproportion of the proportion of times each route is ran. Specifically a lot of the time receivers ran no route."}
 
-plays_of_route_runners |> 
-  ggplot(aes(x = fct_rev(fct_infreq(routeRan)), fill = routeRan)) +
-  geom_bar() +
+# Plot of distribution of routes ran
+prop_route |> 
+  ggplot(aes(x = fct_reorder(routeRan, prop), y = prop, fill = routeRan)) +
+  geom_bar(stat = "identity") +
   theme_bw() +
   theme(axis.text.x = element_text(size = 8.5), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 12), axis.text = element_text(face = "bold")) +
   labs(
     title = "Distribution of Routes Ran By Wide Recievers",
     x = "Route Ran",
-    y = "Number of Times That Route Was Ran"
+    y = "Proportion Of The Time Route Was Ran"
   )
 ```
 
@@ -178,8 +178,8 @@ plays_of_route_runners |>
 ### Formations ------------------------
 
 ```{r}
-# The number of times and the proportion of the time each formation is used
-plays_of_route_runners |> 
+# Table of the number of times and the proportion of the time each formation is used
+prop_formation <- plays_of_route_runners |> 
   group_by(offenseFormation) |> 
   summarise(occurances = n()) |> 
   mutate(prop = occurances / sum(occurances)) 
@@ -187,17 +187,16 @@ plays_of_route_runners |>
 
 
 ```{r}
-# Distribution of Formations 
-
-plays_of_route_runners |> 
-  ggplot(aes(x = fct_rev(fct_infreq(offenseFormation)), fill = offenseFormation)) +
-  geom_bar() +
+# Graph showing distribution of formations 
+prop_formation |> 
+  ggplot(aes(x = fct_reorder(offenseFormation, prop), y = prop, fill = offenseFormation)) +
+  geom_bar(stat = "identity") +
   theme_bw() +
-  theme(axis.text.x = element_text(size = 8.5), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 12), axis.text = element_text(face = "bold")) +
+  theme(axis.text.x = element_text(size = 8.5), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 10), axis.text = element_text(face = "bold")) +
   labs(
     title = "Distribution of Formation Usage",
     x = "Formation",
-    y = "Number of Times That Formation Was Used"
+    y = "Proportion of Time Formation Was Used"
   )
 ```
 
@@ -219,29 +218,74 @@ plays_of_route_runners |>
 ### Receiver Alignment ---------------------------
 
 ```{r}
-# The number of times and the proportion of the time each receiver alignment is used
-plays_of_route_runners |> 
+# Table showing he number of times and the proportion of the time each receiver alignment is used
+receiver_align_prop <- plays_of_route_runners |> 
   group_by(receiverAlignment) |> 
   summarise(occurances = n()) |> 
   mutate(prop = occurances / sum(occurances)) 
 ```
 
 ```{r}
-# Distribution of Receiver Alignment 
+# Graph showing distribution of receiver alignment 
 
-plays_of_route_runners |> 
-  ggplot(aes(x = fct_rev(fct_infreq(receiverAlignment)), fill = receiverAlignment)) +
-  geom_bar() +
+receiver_align_prop |> 
+  ggplot(aes(x = fct_reorder(receiverAlignment, prop), y= prop, fill = receiverAlignment)) +
+  geom_bar(stat = "identity") +
   theme_bw() +
-  theme(axis.text.x = element_text(size = 8.5), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 12), axis.text = element_text(face = "bold")) +
+  theme(axis.text.x = element_text(size = 8.5), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 10), axis.text = element_text(face = "bold")) +
   labs(
     title = "Distribution of Receiver Alignment Usage",
     x = "Receiver Alignment",
-    y = "Number of Times That Receiver Alignment Was Used"
+    y = "Proportion of Times Receiver Alignment Was Used"
   )
 ```
 
 ### Motion ---------------------------------------
+
+#### Proportion of Plays Where A Player Was Motioned ----------------
+
+##### Entire League 
+```{r}
+motion_plays <- plays_of_route_runners |>
+  mutate(motioned = ifelse(!is.na(inMotionAtBallSnap), "Yes", "No")) |>  # NAs represent players that never motioned at all
+  filter(motioned == "Yes") |>
+  distinct(gameId, playId) |> 
+  count() |> 
+  rename(num_motion_plays = n)
+
+total_plays <- plays_of_route_runners |> 
+  distinct(gameId, playId) |> 
+  count() |> 
+  rename(num_total_plays = n)
+
+calc_prop_motion <- bind_cols(motion_plays, total_plays) |> 
+  mutate(motioned = num_motion_plays / num_total_plays,
+         no_motion = 1 - motioned)
+
+prop_motion <- calc_prop_motion |> 
+  select(motioned, no_motion) |> 
+  pivot_longer(motioned:no_motion, names_to = "motion", values_to = "prop") |> 
+  mutate(motion = ifelse(motion == "motioned", "Yes", "No"))
+```
+
+```{r}
+# Graph showing distribution of plays with motion
+prop_motion |>   
+  ggplot(aes(x = motion, y= prop, fill = motion)) +
+  geom_bar(stat = "identity") +
+  theme_bw() +
+  theme(axis.text.x = element_text(size = 8.5), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 12), axis.text = element_text(face = "bold")) +
+  labs(
+    title = "Distribution of Plays With Motion Or Not",
+    x = "At Least One Player Motioned",
+    y = "Proportion of Plays"
+  )
+```
+
+##### Teams 
+
+
+##### Players
 
 #### Motion from the line of scrimmage -------------
 
@@ -271,12 +315,27 @@ team_prop_motion_from_line <- set_at_line|>
 team_prop_motion_from_line
 ```
 
+```{r}
+# Graph showing distribution of teams motioning players set at the line of scrimmage 
+
+team_prop_motion_from_line |> 
+  ggplot(aes(x = fct_reorder(possessionTeam, prop_in_motion_from_line), y= prop_in_motion_from_line, fill = possessionTeam)) +
+  geom_bar(stat = "identity") +
+  theme_bw() +
+  theme(axis.text.x = element_text(size = 8.5), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 10), axis.text = element_text(face = "bold", angle = 90)) +
+  labs(
+    title = "Distribution of Teams Motioning From Line",
+    x = "Team",
+    y = "Prop of Times Team Motioned Players At Line"
+  )
+```
+
 
 #### Motion and stay in motion at snap ------------------------
 
 ##### WR that were still in motion at snap if they motioned at some point (excludes players that were not in motion prior to snap)
 ```{r}
-# All plays where a WR was in motion at some point
+# plays where a WR was in motion at some point
 motion <- plays_of_route_runners |> 
   mutate(inMotionAtBallSnap = ifelse(inMotionAtBallSnap == TRUE, 1, 0)) |> 
   drop_na(inMotionAtBallSnap) # NAs represent players that never motioned at all
