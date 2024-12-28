@@ -53,13 +53,15 @@ tracking_week8 <- read.csv("tracking_week_9.csv")
 player_play_w_info <- player_play |> 
   inner_join(plays, join_by(gameId, playId))
 
+player_play
+
 # identify all players (by nflID) that play WR 
 WR <- players |> 
   filter(position == "WR") |> 
   distinct(nflId)
 ```
 
-# Finding out which positions other than WR & TE are running routes 
+# Finding out which positions other than WR are running routes 
 ```{r}
 # identify all players that ran at least one route 
 route_runners <- player_play |> 
@@ -108,15 +110,15 @@ no_route_ran <- plays_of_route_runners |>
 no_route_ran
 ```
 
+
+### Removing Deadplays
 ```{r}
 # Plays where the ball is spiked or the QB kneels - there are 188
 deadplays <- plays |> 
   filter(is.na(offenseFormation))
 
 deadplays
-```
 
-```{r}
 # removes kneeling and spike plays - now there are 6,690 plays
 no_route_ran <- anti_join(no_route_ran, deadplays)
 
@@ -127,7 +129,10 @@ no_route_ran
 plays_of_route_runners <- anti_join(plays_of_route_runners, deadplays, join_by(gameId, playId))
 
 plays_of_route_runners
+```
 
+### Removing QB Sneaks
+```{r}
 # remove QB sneaks from the data. This is okay to remove because QB sneaks are very predictable plays so the defense already knows the receiver isn't running a route. - There are still 40,438 reciever plays
 plays_of_route_runners <- plays_of_route_runners |> 
   filter(is.na(qbSneak) | qbSneak == FALSE)
@@ -145,6 +150,7 @@ no_route_ran
 
 ```
 
+### Exploring the NAs left
 ```{r}
 # See how many plays now have NAs for routes ran - 15,393
 plays_of_route_runners |> 
@@ -155,7 +161,7 @@ plays_of_route_runners |>
   count(playNullifiedByPenalty)
 ```
 
-# Replacing NAs with saying no route ran - do we want to change this so people who blocked someone it says block. And the rest say NO ROUTE?
+# Replacing NAs with saying no route ran - 
 ```{r}
 plays_of_route_runners <- plays_of_route_runners |> 
   mutate(routeRan = replace_na(routeRan, "NO ROUTE"))
@@ -266,7 +272,7 @@ jumbo <- plays_of_route_runners |>
 
 jumbo
 
-# answered questions like - (1) are plays with off formation jumbo always runs (no) (2) how often in the jumbo formation do recievers run routes (3) how often do receivers block on jumbo plays
+# answered questions like - (1) are plays with off formation jumbo always runs (no) (2) how often in the jumbo formation do receivers run routes (3) how often do receivers block on jumbo plays
 plays_of_route_runners |> 
   inner_join(jumbo) |> 
   filter(!is.na(passLength)) |> 
@@ -362,10 +368,40 @@ team_prop_motion |>
     y = "Proportion of Plays Motioned"
   )
 ```
+```{r}
+plays_of_route_runners |> 
+  ggplot(aes(x = inMotionAtBallSnap, fill = inMotionAtBallSnap)) +
+  geom_bar() +
+  theme_bw() +
+  theme(axis.text.x = element_text(size = 8.5, angle = 90), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 12), axis.text = element_text(face = "bold")) +
+  labs(
+    title = "Distribution of Players In Motion At Snap",
+    x = "Motion At Snap",
+    y = "Number of Players"
+  )
+  
+```
+```{r}
+plays_of_route_runners |> 
+  count(inMotionAtBallSnap)
+
+
+
+plays_of_route_runners |> 
+  filter(motionSinceLineset == FALSE | is.na(motionSinceLineset),
+        inMotionAtBallSnap == TRUE)
+
+plays_of_route_runners |> 
+  count(shiftSinceLineset)
+
+```
+
+
 
 # Work That Will Not Be Used ---------------------------------------------------------
 
 # Figuring Out When They Might Be Blocking ----------------------
+
 ```{r}
 # All plays where the WR blocked a player- on 11 of them the WR still ran a route
 plays_of_route_runners |> 
