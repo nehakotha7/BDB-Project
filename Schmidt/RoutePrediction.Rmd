@@ -246,9 +246,11 @@ receiver_align_prop |>
 
 ##### Entire League 
 ```{r}
-motion_plays <- plays_of_route_runners |>
+motion <- plays_of_route_runners |>
   mutate(motioned = ifelse(!is.na(inMotionAtBallSnap), "Yes", "No")) |>  # NAs represent players that never motioned at all
-  filter(motioned == "Yes") |>
+  filter(motioned == "Yes")
+
+motion_plays <- motion|>
   distinct(gameId, playId) |> 
   count() |> 
   rename(num_motion_plays = n)
@@ -283,28 +285,47 @@ prop_motion |>
 ```
 
 ##### Teams 
+```{r}
+team_motion <- motion |> 
+  distinct(possessionTeam, gameId, playId) |> 
+  count(possessionTeam) |> 
+  rename(num_motion_plays = n)
 
+team_total_plays <- plays_of_route_runners |> 
+  distinct(possessionTeam, gameId, playId) |> 
+  count(possessionTeam) |> 
+  rename(num_total_plays = n)
+
+prop_motion_team <- full_join(team_motion, team_total_plays)|> 
+  mutate(prop_motioned = num_motion_plays / num_total_plays) 
+```
+
+```{r}
+# Graph showing distribution of teams motioning
+
+prop_motion_team |> 
+  ggplot(aes(x = fct_reorder(possessionTeam, prop_motioned), y= prop_motioned, fill = possessionTeam)) +
+  geom_bar(stat = "identity") +
+  theme_bw() +
+  theme(axis.text.x = element_text(size = 8.5), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 10), axis.text = element_text(face = "bold", angle = 90)) +
+  labs(
+    title = "Distribution of Teams Motioning",
+    x = "Team",
+    y = "Prop of Plays Team Motioned At Least One Player"
+  )
+```
 
 ##### Players
 
-#### Motion from the line of scrimmage -------------
+#### Motion from the line of scrimmage (excludes players that were not set at the line) -------------
 
-##### WR that motioned from the line of scrimmage (excludes players that were not set at the line)
 ```{r}
 set_at_line <- plays_of_route_runners |> 
   mutate(motionSinceLineset = ifelse(motionSinceLineset == TRUE, 1, 0)) |>
   drop_na(motionSinceLineset) # removes players that were not set at the line of scrimmage
-
-# the proportion of the times each player motioned when they were set at the line
-player_prop_motion_from_line <- set_at_line|> 
-  group_by(displayName) |> 
-  summarise(prop_in_motion_from_line = round(mean(motionSinceLineset), 3)) |> 
-  arrange(prop_in_motion_from_line)
-
-player_prop_motion_from_line
 ```
 
-##### Teams motioning players from line of scrimmage
+##### Teams
 ```{r}
 # the proportion of the times each player motioned when they were set at the line
 team_prop_motion_from_line <- set_at_line|> 
@@ -330,27 +351,27 @@ team_prop_motion_from_line |>
   )
 ```
 
+##### Players
+```{r}
+# the proportion of the times each player motioned when they were set at the line
+player_prop_motion_from_line <- set_at_line|> 
+  group_by(displayName) |> 
+  summarise(prop_in_motion_from_line = round(mean(motionSinceLineset), 3)) |> 
+  arrange(prop_in_motion_from_line)
 
-#### Motion and stay in motion at snap ------------------------
+player_prop_motion_from_line
+```
 
-##### WR that were still in motion at snap if they motioned at some point (excludes players that were not in motion prior to snap)
+#### Motion and stay in motion at snap (excludes players that were not in motion prior to snap) --------------
+
 ```{r}
 # plays where a WR was in motion at some point
 motion <- plays_of_route_runners |> 
   mutate(inMotionAtBallSnap = ifelse(inMotionAtBallSnap == TRUE, 1, 0)) |> 
   drop_na(inMotionAtBallSnap) # NAs represent players that never motioned at all
-
-# the proportion of the time each player is still in motion at snap when they previously motioned
-player_prop_still_motion_at_snap <- motion|> 
-  group_by(displayName) |> 
-  summarise(prop_still_motion_at_snap = round(mean(inMotionAtBallSnap), 3)) |> 
-  arrange(prop_still_motion_at_snap)
-
-player_prop_still_motion_at_snap
-
 ```
 
-##### Teams motioning players and keeping them in motion at snap
+##### Teams
 ```{r}
 # table of proportion of the time that each team motions and keeps player in motion at snap
 team_prop_motion <- motion|> 
@@ -376,6 +397,17 @@ team_prop_motion |>
   )
 ```
 
+##### Players
+```{r}
+# the proportion of the time each player is still in motion at snap when they previously motioned
+player_prop_still_motion_at_snap <- motion|> 
+  group_by(displayName) |> 
+  summarise(prop_still_motion_at_snap = round(mean(inMotionAtBallSnap), 3)) |> 
+  arrange(prop_still_motion_at_snap)
+
+player_prop_still_motion_at_snap
+
+```
 
 # Appendix ----------------------------------------------------------------------------
 
