@@ -306,9 +306,10 @@ prop_motion_team <- full_join(team_motion, team_total_plays)|>
 prop_motion_team |> 
   ggplot(aes(x = fct_reorder(possessionTeam, prop_motioned), y= prop_motioned, fill = possessionTeam)) +
   geom_bar(stat = "identity") +
-  geom_hline(yintercept = 0.6618385, linetype = "dashed", color = "black", size = 1) +
+  geom_hline(yintercept = 0.6618385, linetype = "dashed", color = "#FFC125", size = 1) +
   theme_bw() +
   theme(axis.text.x = element_text(size = 8.5), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 10), axis.text = element_text(face = "bold", angle = 90)) +
+  scale_fill_nfl() +
   labs(
     title = "Distribution of Teams Motioning",
     x = "Team",
@@ -390,8 +391,9 @@ team_prop_motion_from_line <- set_at_line|>
 team_prop_motion_from_line |> 
   ggplot(aes(x = fct_reorder(possessionTeam, prop_in_motion_from_line), y= prop_in_motion_from_line, fill = possessionTeam)) +
   geom_bar(stat = "identity") +
-  geom_hline(yintercept = 0.1198928, linetype = "dashed", color = "black", size = 1) +
+  geom_hline(yintercept = 0.1198928, linetype = "dashed", color = "#FFC125", size = 1) +
   theme_bw() +
+  scale_fill_nfl() +
   theme(axis.text.x = element_text(size = 8.5), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 10), axis.text = element_text(face = "bold", angle = 90)) +
   labs(
     title = "Distribution of Teams Motioning From Line",
@@ -454,7 +456,6 @@ team_prop_motion <- motion|>
   summarise(propInMotion = round(mean(inMotionAtBallSnap), 3)) |> 
   arrange(propInMotion)
 
-team_prop_motion
 ```
 
 ```{r, fig.cap="The distribution is relatively even. MIA motions A LOT though. PHI and NE seem to motion less.}
@@ -463,11 +464,12 @@ team_prop_motion
 team_prop_motion |> 
   ggplot(aes(x = fct_reorder(possessionTeam, propInMotion), y = propInMotion, fill = possessionTeam)) +
   geom_bar(stat = "identity") +
-  geom_hline(yintercept = 0.1096526, linetype = "dashed", color = "black", size = 1) +
+  geom_hline(yintercept = 0.1096526, linetype = "dashed", color = "#FFC125", size = 1) +
   theme_bw() +
+  scale_fill_nfl() +
   theme(axis.text.x = element_text(size = 8.5, angle = 90), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 12), axis.text = element_text(face = "bold")) +
   labs(
-    title = "Proportion of Players Each NFL Team Motions & Keeps In Motion At Snap ",
+    title = "Proportion of Players Each NFL Team Motions & Stays In Motion At Snap ",
     x = "NFL Team",
     y = "Prop of Players That Stayed In Motion At Snap"
   )
@@ -482,7 +484,6 @@ player_prop_still_motion_at_snap <- motion|>
   arrange(prop_still_motion_at_snap)
 
 player_prop_still_motion_at_snap
-
 ```
 
 # Appendix ----------------------------------------------------------------------------
