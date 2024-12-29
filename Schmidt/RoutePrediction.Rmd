@@ -268,6 +268,7 @@ prop_motion <- calc_prop_motion |>
   select(motioned, no_motion) |> 
   pivot_longer(motioned:no_motion, names_to = "motion", values_to = "prop") |> 
   mutate(motion = ifelse(motion == "motioned", "Yes", "No"))
+
 ```
 
 ```{r}
@@ -302,10 +303,10 @@ prop_motion_team <- full_join(team_motion, team_total_plays)|>
 
 ```{r}
 # Graph showing distribution of teams motioning
-
 prop_motion_team |> 
   ggplot(aes(x = fct_reorder(possessionTeam, prop_motioned), y= prop_motioned, fill = possessionTeam)) +
   geom_bar(stat = "identity") +
+  geom_hline(yintercept = 0.6618385, linetype = "dashed", color = "black", size = 1) +
   theme_bw() +
   theme(axis.text.x = element_text(size = 8.5), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 10), axis.text = element_text(face = "bold", angle = 90)) +
   labs(
@@ -317,13 +318,62 @@ prop_motion_team |>
 
 ##### Players
 
-#### Motion from the line of scrimmage (excludes players that were not set at the line) -------------
+```{r}
+player_motion <- motion |> 
+  distinct(displayName, gameId, playId) |> 
+  count(displayName) |> 
+  rename(num_motion_plays = n)
+
+player_total_plays <- plays_of_route_runners |> 
+  distinct(displayName, gameId, playId) |> 
+  count(displayName) |> 
+  rename(num_total_plays = n)
+```
 
 ```{r}
+prop_motion_player <- full_join(player_motion, player_total_plays)|> 
+  mutate(prop_motioned = num_motion_plays / num_total_plays) |> 
+  select(displayName, prop_motioned) |> 
+  mutate(prop_motioned = replace_na(prop_motioned, 0)) |> 
+  arrange(prop_motioned) 
+```
+
+
+#### Motion from the line of scrimmage (excludes players that were not set at the line) -------------
+
+##### Entire League 
+
+```{r}
+# plays of players where they were set at the line
 set_at_line <- plays_of_route_runners |> 
   mutate(motionSinceLineset = ifelse(motionSinceLineset == TRUE, 1, 0)) |>
   drop_na(motionSinceLineset) # removes players that were not set at the line of scrimmage
 ```
+
+```{r}
+league_motion_line <- set_at_line |> 
+  group_by(motionSinceLineset) |> 
+  summarise(num_plays = n()) |> 
+  ungroup() |> 
+  mutate(total_plays = sum(num_plays),
+         prop = num_plays / total_plays,
+         motionSinceLineset = ifelse(motionSinceLineset == 1, "Yes", "No")) 
+```
+
+```{r}
+# Graph showing distribution of plays with players on line motioning
+league_motion_line |>   
+  ggplot(aes(x = motionSinceLineset, y= prop, fill = motionSinceLineset)) +
+  geom_bar(stat = "identity") +
+  theme_bw() +
+  theme(axis.text.x = element_text(size = 8.5), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 12), axis.text = element_text(face = "bold")) +
+  labs(
+    title = "Distribution of Players Set On Line That Motioned",
+    x = "Players On Line Motioned",
+    y = "Proportion of Plays"
+  )
+```
+
 
 ##### Teams
 ```{r}
@@ -332,8 +382,6 @@ team_prop_motion_from_line <- set_at_line|>
   group_by(possessionTeam) |> 
   summarise(prop_in_motion_from_line = round(mean(motionSinceLineset), 3)) |> 
   arrange(prop_in_motion_from_line)
-
-team_prop_motion_from_line
 ```
 
 ```{r}
@@ -342,6 +390,7 @@ team_prop_motion_from_line
 team_prop_motion_from_line |> 
   ggplot(aes(x = fct_reorder(possessionTeam, prop_in_motion_from_line), y= prop_in_motion_from_line, fill = possessionTeam)) +
   geom_bar(stat = "identity") +
+  geom_hline(yintercept = 0.1198928, linetype = "dashed", color = "black", size = 1) +
   theme_bw() +
   theme(axis.text.x = element_text(size = 8.5), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 10), axis.text = element_text(face = "bold", angle = 90)) +
   labs(
@@ -362,13 +411,39 @@ player_prop_motion_from_line <- set_at_line|>
 player_prop_motion_from_line
 ```
 
+
 #### Motion and stay in motion at snap (excludes players that were not in motion prior to snap) --------------
 
+##### Entire League
 ```{r}
 # plays where a WR was in motion at some point
 motion <- plays_of_route_runners |> 
   mutate(inMotionAtBallSnap = ifelse(inMotionAtBallSnap == TRUE, 1, 0)) |> 
   drop_na(inMotionAtBallSnap) # NAs represent players that never motioned at all
+```
+
+```{r}
+league_motion_snap <- motion |> 
+  group_by(inMotionAtBallSnap) |> 
+  summarise(num_plays = n()) |> 
+  ungroup() |> 
+  mutate(total_plays = sum(num_plays),
+         prop = num_plays / total_plays,
+         inMotionAtBallSnap = ifelse(inMotionAtBallSnap == 1, "Yes", "No")) 
+```
+
+```{r}
+# Graph showing distribution of plays with players on line motioning
+league_motion_snap |>   
+  ggplot(aes(x = inMotionAtBallSnap, y= prop, fill = inMotionAtBallSnap)) +
+  geom_bar(stat = "identity") +
+  theme_bw() +
+  theme(axis.text.x = element_text(size = 8.5), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 12), axis.text = element_text(face = "bold")) +
+  labs(
+    title = "Distribution of Players That Stayed In Motion At Snap",
+    x = "Players Stayed In Motion At Snap?",
+    y = "Proportion of Plays"
+  )
 ```
 
 ##### Teams
@@ -386,14 +461,15 @@ team_prop_motion
 # Visualization of proportion of the time that each team motions and keeps player in motion at snap - fix this so each team is represented by their team colors
 
 team_prop_motion |> 
-  ggplot(aes(x = possessionTeam, y = propInMotion, fill = possessionTeam)) +
+  ggplot(aes(x = fct_reorder(possessionTeam, propInMotion), y = propInMotion, fill = possessionTeam)) +
   geom_bar(stat = "identity") +
+  geom_hline(yintercept = 0.1096526, linetype = "dashed", color = "black", size = 1) +
   theme_bw() +
   theme(axis.text.x = element_text(size = 8.5, angle = 90), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 12), axis.text = element_text(face = "bold")) +
   labs(
     title = "Proportion of Players Each NFL Team Motions & Keeps In Motion At Snap ",
     x = "NFL Team",
-    y = "Prop of Players That Motion And Stay in Motion Per Team"
+    y = "Prop of Players That Stayed In Motion At Snap"
   )
 ```
 
