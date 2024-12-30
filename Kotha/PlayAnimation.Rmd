@@ -1,0 +1,213 @@
+---
+title: "BDB_Project"
+author: "Neha Kotha"
+date: "2024-12-29"
+output: html_document
+---
+
+```{r}
+library(nflverse)
+library(nflreadr)
+library(nflplotR)
+library(ggplot2)
+library(tidyverse)
+library(gganimate)
+library(dplyr)
+library(gganimate)
+library(ggfootball)
+library(ranger)
+library(caret) 
+library(help = "nflreadr")
+```
+
+```{r}
+games <- read.csv("games.csv")
+player_play <- read.csv("player_play.csv")
+players <- read.csv("players.csv")
+plays <- read.csv("plays.csv")
+```
+
+```{r}
+tracking_w_1 <- read.csv("tracking_week_1.csv")
+tracking_w_2 <- read.csv("tracking_week_2.csv")
+tracking_w_3 <- read.csv("tracking_week_3.csv")
+tracking_w_4 <- read.csv("tracking_week_4.csv")
+tracking_w_5 <- read.csv("tracking_week_5.csv")
+tracking_w_6 <- read.csv("tracking_week_6.csv")
+tracking_w_7 <- read.csv("tracking_week_7.csv")
+tracking_w_8 <- read.csv("tracking_week_8.csv")
+tracking_w_9 <- read.csv("tracking_week_9.csv")
+```
+
+# identify specific playId. determine play based on game clock and play description 
+```{r}
+# identify specific play to analyze
+specific_play <- plays |> 
+  filter(possessionTeam == 'LA', 
+         defensiveTeam == 'SF', 
+         quarter == 2, down == 1, 
+         yardsToGo == 10, preSnapHomeScore==7, preSnapVisitorScore==3) 
+specific_play
+```
+
+# PLAY ANIMATION
+# filter data for one singular play: find nflId's of all players on the field and the ball data for play animation.
+```{r}
+# animation of MIA v CIN week 4, Q1 ----------------------------------
+MIA_CIN_play <- tracking_w_4 |> 
+  filter(
+    gameId == 2022092900,
+    club %in% c("MIA", "CIN"),
+    playId == 383
+  ) |> 
+  arrange(desc(s))
+
+# all players on the field nflId's during pass play
+players_on_field <- MIA_CIN_play |> 
+  select(nflId, club, jerseyNumber) |> 
+  distinct()
+
+nfl_Ids <- players_on_field |> 
+  pull(nflId)   
+
+nfl_Ids
+
+# filter tracking data to include specific players for this play and time range
+MIA_CIN_play <- tracking_w_4 |> 
+  filter(
+    gameId == 2022092900,  
+    playId == 383, 
+    nflId %in% nfl_Ids 
+  )
+
+MIA_CIN_play
+
+# filter for ball data
+ball_data <- tracking_w_4 |> 
+  filter(
+    gameId == 2022092900,
+    playId == 383,
+    is.na(nflId)  # row with NA nflId corresponds to the ball
+  )
+
+range(MIA_CIN_play$x)
+range(MIA_CIN_play$y)
+```
+
+# animation of all players movement during the run play (1st Q, MIA vs. CIN, week 4)
+```{r}
+# define team colors
+team_colors <- c("MIA" = "#00B5E2", "CIN" = "#FF5F00")
+
+animation_all_players <- ggfootball(left_endzone = "#00B5E2", right_endzone = "#FF5F00", field_alpha = 0.8) +
+  
+  # plot all players positions over time as points
+  geom_point(data = MIA_CIN_play, 
+             aes(x = x, y = y, fill = club), size = 2, shape = 21, color = "black", stroke = 0.5, show.legend = FALSE) + 
+  # add labels for jersey numbers
+  geom_text(data = MIA_CIN_play, 
+            aes(x = x, y = y, label = jerseyNumber, color = club),
+            size = 3, vjust = -1, show.legend = FALSE) +
+  # add the ball
+  geom_point(data = ball_data, 
+             aes(x = x, y = y), size = 1, shape = 23, fill = "brown", color = "black", stroke = 0.5, show.legend = FALSE) +
+ 
+   # set theme and limits for the plot
+  coord_fixed(xlim = c(55, 95), ylim = c(15, 55)) + 
+  scale_color_manual(values = c("#FF5F00","#00B5E2")) +  # map team colors for the borders (arrows and text)
+  scale_fill_manual(values = c("#FF5F00","#00B5E2")) +   # map team colors for the fill (inside of the points)
+  labs(title = "Player Movements During MIA vs. CIN Pass Play",
+       subtitle = "Frame: {frame_time}") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0),
+    plot.subtitle = element_text(hjust = 0),
+    axis.title = element_blank(),   
+    axis.text = element_blank(),    
+    axis.ticks = element_blank()
+  )
+
+# create the animation with transition by frameId
+animation_all_players <- animation_all_players + 
+  transition_time(frameId) +  # animate based on frameId
+  ease_aes('linear') 
+
+# display animation with proper frames per second 
+total_frames <- length(unique(MIA_CIN_play$frameId))
+animate(animation_all_players, nframes = total_frames, fps = 25, duration = total_frames / 10,
+        width = 800, height = 500, res = 150)
+```
+
+# OLD CODE: includes full field view and arrows (orientation is incorrect)
+# animation of all players movement during the run play (1st Q, MIA vs. CIN, week 4)
+```{r}
+
+# define team colors
+team_colors <- c("MIA" = "#00B5E2", "CIN" = "#FF5F00")
+
+animation_all_players <- ggfootball(left_endzone = "#00B5E2", right_endzone = "#FF5F00", field_alpha = 0.8) +
+  
+  # plot all players positions over time as points
+  geom_point(data = MIA_CIN_play, 
+             aes(x = x, y = y, fill = club), size = 2, shape = 21, color = "black", stroke = 0.5, show.legend = FALSE) + 
+  # add labels for jersey numbers
+  geom_text(data = MIA_CIN_play, 
+            aes(x = x, y = y, label = jerseyNumber, color = club),
+            size = 3, vjust = -1, show.legend = FALSE) +
+  # add the ball
+  geom_point(data = ball_data, 
+             aes(x = x, y = y), size = 1, shape = 23, fill = "brown", color = "black", stroke = 0.5, show.legend = FALSE) +
+  # add arrows for player orientation
+  geom_segment(data = MIA_CIN_play, 
+               aes(x = x, y = y, 
+                   xend = pmin(pmax(x + cos(o * pi / 180) * 5, 0), 120),  # multiplier to adjust arrow length
+                   yend = pmin(pmax(y + sin(o * pi / 180) * 5, 0), 53.3),   
+                   color = club),
+               arrow = arrow(type = "closed", length = unit(0.05, "inches")), size = 0.2, color = "black", show.legend = FALSE) +
+  # set theme and limits for the plot
+  coord_fixed(xlim = c(0, 120), ylim = c(0, 53.3)) + 
+  scale_color_manual(values = c("#FF5F00","#00B5E2")) +  # map team colors for the borders (arrows and text)
+  scale_fill_manual(values = c("#FF5F00","#00B5E2")) +   # map team colors for the fill (inside of the points)
+  labs(title = "Player Movements During Run Play", 
+       subtitle = "Frame: {frame_time}", 
+       x = "X Position (yards)", y = "Y Position (yards)") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+# create the animation with transition by frameId
+animation_all_players <- animation_all_players + 
+  transition_time(frameId) +  # animate based on frameId
+  ease_aes('linear') 
+
+# display animation with proper Frames Per Second (FPS)
+total_frames <- length(unique(MIA_CIN_play$frameId))
+animate(animation_all_players, nframes = total_frames, fps = 25, duration = total_frames / 10,
+        width = 800, height = 500, res = 150)
+```
+
+```{r}
+# Get unique club names
+unique_clubs <- tracking_w_1 |> 
+  select(club) |> 
+  distinct()
+```
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
