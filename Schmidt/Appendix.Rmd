@@ -1,0 +1,144 @@
+---
+title: "Appendix"
+output: html_document
+---
+
+# Appendix ----------------------------------------------------------------------------
+
+# Identifying which player position to focus on in our analysis --------------------------
+
+```{r}
+# identify all players (by nflID) that play WR 
+WR <- players |> 
+  filter(position == "WR") |> 
+  distinct(nflId)
+
+# identify all players that ran at least one route 
+route_runners <- player_play |> 
+  drop_na(routeRan) |> 
+  distinct(nflId)
+
+# identify which players were not WR that ran a route 
+Non_WR_route_runners <- anti_join(route_runners, WR)
+  
+# identify which positions ran routes that were not WR and how often - notice there are QB, FB, TE, and RB as well
+left_join(Non_WR_route_runners, players) |> 
+  count(position)
+
+# find out how many players play each position
+players |> 
+  count(position)
+```
+
+# Exploring the NAs left ------------------------------- 
+
+```{r}
+# See how many plays now have NAs for routes ran - 15,393
+plays_of_WR |> 
+  filter(routeRan == "NO ROUTE")
+
+# There are no plays that were blown dead because of penalty
+plays_of_WR |> 
+  count(playNullifiedByPenalty)
+```
+
+## Figuring out when they might be blocking
+
+```{r}
+# All plays where the WR blocked a player- on 11 of them the WR still ran a route
+plays_of_WR |> 
+  filter(!is.na(blockedPlayerNFLId1))
+```
+
+```{r}
+# Find out which routes have at least one WR that ran that route and one WR that did not run a route - makes sense that screen is one of the highest 
+plays_of_WR |> 
+  inner_join(no_route_ran) |> 
+  filter(routeRan != "NO ROUTE") |> 
+  count(routeRan)
+```
+
+## Identifying receivers the did not run routes when screen route was run
+```{r}
+screen_plays <- plays_of_WR |> 
+  filter(routeRan == "SCREEN") |> 
+  distinct(gameId, playId)
+
+plays_of_WR |> 
+  inner_join(screen_plays)|> 
+  filter(routeRan == "NO ROUTE")|> 
+  group_by(gameId, playId) |> 
+  summarise(num_receivers_no_route = n()) |> 
+  ungroup() |> 
+  count(num_receivers_no_route)
+```
+
+## Figuring out if receivers are running routes on sacks
+```{r}
+plays_of_WR |> 
+  filter(passResult == "S") |> 
+  count(routeRan)
+```
+
+# Exploring Formations ------------------------------
+
+## Jumbo 
+```{r}
+
+# filtering for plays where the formation was Jumbo
+jumbo <- plays_of_WR |> 
+  filter(offenseFormation == "JUMBO"
+         ) |> 
+  distinct(gameId, playId)
+
+jumbo
+
+# answered questions like - (1) are plays with off formation jumbo always runs (no) (2) how often in the jumbo formation do receivers run routes (3) how often do receivers block on jumbo plays
+plays_of_WR |> 
+  inner_join(jumbo) |> 
+  filter(!is.na(passLength)) |> 
+  #filter(routeRan != "NO ROUTE") |> 
+  #filter(is.na(blockedPlayerNFLId1)) |> 
+  #count(gameId, playId) |> 
+  #count(n)
+
+```
+
+## Wildcat
+```{r}
+
+# filtering for plays where the formation was wildcat
+wildcat <- plays_of_WR |> 
+  filter(offenseFormation == "WILDCAT"
+         ) |> 
+  distinct(gameId, playId)
+
+wildcat
+
+# how many WR do not run routes when in the wildcat formation - can not remove wildcats because receivers are still running routes
+plays_of_WR |> 
+  inner_join(wildcat) |> 
+  filter(routeRan != "NO ROUTE") |> 
+  count(gameId, playId) |> 
+  count(n) |> 
+  rename(num_receivers = n,
+         num_occurrences = nn)
+
+```
+
+# Figuring Out Differences / Relationships Between `motionSinceLineset` & `inMotionAtBallSnap` ------------
+
+```{r}
+plays_of_WR |> 
+  count(inMotionAtBallSnap)
+
+
+
+plays_of_WR |> 
+  filter(motionSinceLineset == FALSE | is.na(motionSinceLineset),
+        inMotionAtBallSnap == TRUE)
+
+plays_of_WR |> 
+  count(shiftSinceLineset)
+
+```

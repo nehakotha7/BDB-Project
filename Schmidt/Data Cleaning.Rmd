@@ -43,16 +43,18 @@ tracking_week7 <- read.csv("tracking_week_7.csv")
 tracking_week8 <- read.csv("tracking_week_9.csv")
 ```
 
-# Determining What Plays To Include in Route Running Predicition ------------------
+# Creating WR Play By Play Data For Prediction Plays --------------------------------------------
 
-## Setting up the data for more exploration
+## Determining What Plays To Include in Route Running Predicition ------------------
+
+### Setting up the data for more exploration
 ```{r}
 # add play information to individual player play by play data
 player_play_w_info <- player_play |> 
   inner_join(plays, join_by(gameId, playId))
 ```
 
-## Decided to focus on only WR 
+### Decided to focus on only WR 
 ```{r}
 # Players WR Positions - Include only position of each player, their name, and their NFLId
 positions <- players |> 
@@ -63,7 +65,7 @@ positions <- players |>
 plays_of_WR <- inner_join(player_play_w_info, positions)
 ```
 
-## Finding the distribution of the routes ran - it is a little worrisome that so many routes are NAs. There is also a very large disproportion each route is run
+### Finding the distribution of the routes ran - it is a little worrisome that so many routes are NAs. There is also a very large disproportion each route is run
 ```{r}
 # The number of times and the proportion of the time each route is run by WR or TEs 
 plays_of_WR |> 
@@ -72,7 +74,7 @@ plays_of_WR |>
   mutate(prop = occurances / sum(occurances)) 
 ```
 
-# Figuring out what some of the NAs could mean -------------------
+## Figuring out what some of the NAs could mean -------------------
 
 ```{r}
 # Plays where at least one receiver or tight end did not run a route - there are 6,874 plays
@@ -81,7 +83,7 @@ no_route_ran <- plays_of_WR |>
   distinct(gameId, playId)
 ```
 
-## Removing Deadplays
+### Removing Deadplays
 ```{r}
 # Plays where the ball is spiked or the QB kneels - there are 188
 deadplays <- plays |> 
@@ -96,7 +98,7 @@ no_route_ran <- anti_join(no_route_ran, deadplays)
 plays_of_WR <- anti_join(plays_of_WR, deadplays, join_by(gameId, playId))
 ```
 
-## Removing QB Sneaks
+### Removing QB Sneaks
 ```{r}
 # remove QB sneaks from the data. This is okay to remove because QB sneaks are very predictable plays so the defense already knows the receiver isn't running a route. - There are still 40,438 reciever plays
 plays_of_WR <- plays_of_WR |> 
@@ -112,16 +114,17 @@ no_route_ran <- no_route_ran|>
 
 ```
 
-## Replacing NAs with saying no route ran 
+### Replacing NAs with saying no route ran 
 ```{r}
 plays_of_WR <- plays_of_WR |> 
   mutate(routeRan = replace_na(routeRan, "NO ROUTE")) |> 
   select(gameId:teamAbbr, displayName, position, inMotionAtBallSnap:routeRan, playDescription:preSnapVisitorScore, absoluteYardlineNumber, offenseFormation:playClockAtSnap)
-
-# write.csv(plays_of_WR, "wr_plays.csv")
 ```
 
-## Player data of all players 
+
+# Creating play by play data of all offensive players on prediction plays -------------------
+
+### Player data of all players 
 ```{r}
 # All the distinct plays involving WR
 plays_w_WR <- plays_of_WR |> 
@@ -147,6 +150,33 @@ all_positions <- players |>
 # Adds name of player and their position to plays we are predicting 
 predicting_plays <- inner_join(predicting_plays, all_positions)
 
-
+#write.csv(predicting_plays, "offense_prediction_plays.csv")
 ```
 
+```{r}
+predicting_plays <- predicting_plays |>
+  mutate(motioned = ifelse(!is.na(inMotionAtBallSnap), "Yes", "No")) # NAs represent players that never motioned at all
+```
+
+```{r}
+# plays of players where they were set at the line
+predicting_plays <- predicting_plays |> 
+  mutate(set_at_line = ifelse(!is.na(motionSinceLineset), "Yes", "No"))
+```
+
+# Update WR Data ----------------------------------
+
+```{r}
+plays_of_WR <- predicting_plays |> 
+  filter(position == "WR")
+```
+
+# Write CSVs -------------------------------------------
+
+```{r}
+# write.csv(predicting_plays, "offense_prediction_plays.csv")
+```
+
+```{r}
+# write.csv(plays_of_WR, "wr_plays.csv")
+```
