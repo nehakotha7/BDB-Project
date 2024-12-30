@@ -155,7 +155,7 @@ prop_route |>
 
 **Angle:** when the player cuts out 45 degrees and then takes a 90 degree turn and cuts back in (often RB, FB, or TE) - makes sense why few WR run it
 
-**Screen:** Various types. More of a basic screen is where RB catches ball and lineman block. Then Jailbreak screen is where the receiver out wide is the target. Two receivers and a lineman are blockers. Bubble screen is where WR drops back slightly and two recievers block. Drop back screen looks like drop back pass but one WR runs route and other WR block. Could be TE too? 
+**Screen:** Various types. More of a basic screen is where RB catches ball and lineman block. Then Jailbreak screen is where the receiver out wide is the target. Two receivers and a lineman are blockers. Bubble screen is where WR drops back slightly and two receivers block. Drop back screen looks like drop back pass but one WR runs route and other WR block. Could be TE too? 
 
 **Flat:** when the receiver runs a quick short route straight then towards the sideline
 
@@ -242,7 +242,7 @@ receiver_align_prop |>
 
 ### Motion ---------------------------------------
 
-#### Proportion of Plays Where A Player Was Motioned ----------------
+#### Proportion of Plays Where A WR Was Motioned ----------------
 
 ##### Entire League 
 ```{r}
@@ -359,10 +359,11 @@ league_motion_line <- set_at_line |>
   mutate(total_plays = sum(num_plays),
          prop = num_plays / total_plays,
          motionSinceLineset = ifelse(motionSinceLineset == 1, "Yes", "No")) 
+
 ```
 
 ```{r}
-# Graph showing distribution of plays with players on line motioning
+# Graph showing distribution of players set on the line that motioning
 league_motion_line |>   
   ggplot(aes(x = motionSinceLineset, y= prop, fill = motionSinceLineset)) +
   geom_bar(stat = "identity") +
@@ -371,7 +372,7 @@ league_motion_line |>
   labs(
     title = "Distribution of Players Set On Line That Motioned",
     x = "Players On Line Motioned",
-    y = "Proportion of Plays"
+    y = "Proportion of Players"
   )
 ```
 
@@ -484,6 +485,33 @@ player_prop_still_motion_at_snap <- motion|>
   arrange(prop_still_motion_at_snap)
 
 player_prop_still_motion_at_snap
+```
+
+#### Still In Motion At Snap At Line ----------------------------
+
+##### Entire League
+
+```{r}
+line_snap_motion_league <- set_at_line |> 
+  filter(motionSinceLineset == 1) |> 
+  group_by(inMotionAtBallSnap) |> 
+  summarise(num_players = n()) |> 
+  mutate(total_players = sum(num_players),
+         prop = num_players / total_players)
+```
+
+```{r}
+# Graph showing distribution of players that were in motion from the line and stayed in motion at snap
+line_snap_motion_league |>   
+  ggplot(aes(x = inMotionAtBallSnap, y= prop, fill = inMotionAtBallSnap)) +
+  geom_bar(stat = "identity") +
+  theme_bw() +
+  theme(axis.text.x = element_text(size = 8.5), legend.position = "none", plot.title = element_text(hjust = 0.5, face = "bold", size = 14), axis.title = element_text(face = "bold", size = 12), axis.text = element_text(face = "bold")) +
+  labs(
+    title = "Players Set On Line That Motioned & Stayed In Motion At Snap",
+    x = "Players On Line Stayed In Motion At Snap",
+    y = "Proportion of Players"
+  )
 ```
 
 # Appendix ----------------------------------------------------------------------------
