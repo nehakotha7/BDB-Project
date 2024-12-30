@@ -115,7 +115,10 @@ no_route_ran <- no_route_ran|>
 ## Replacing NAs with saying no route ran 
 ```{r}
 plays_of_WR <- plays_of_WR |> 
-  mutate(routeRan = replace_na(routeRan, "NO ROUTE"))
+  mutate(routeRan = replace_na(routeRan, "NO ROUTE")) |> 
+  select(gameId:teamAbbr, displayName, position, inMotionAtBallSnap:routeRan, playDescription:preSnapVisitorScore, absoluteYardlineNumber, offenseFormation:playClockAtSnap)
+
+# write.csv(plays_of_WR, "wr_plays.csv")
 ```
 
 ## Player data of all players 
@@ -133,5 +136,17 @@ predicting_plays <- player_play_w_info |>
 # including only offensive variables
 predicting_plays <- predicting_plays |> 
   select(gameId:teamAbbr, inMotionAtBallSnap:routeRan, playDescription:preSnapVisitorScore, absoluteYardlineNumber, offenseFormation:playClockAtSnap)
+
+```
+
+```{r}
+# Players Positions - Include only position of each player, their name, and their NFLId
+all_positions <- players |> 
+  select(nflId, displayName, position)
+
+# Adds name of player and their position to plays we are predicting 
+predicting_plays <- inner_join(predicting_plays, all_positions)
+
+
 ```
 
