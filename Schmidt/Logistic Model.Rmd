@@ -111,7 +111,7 @@ fit_model <- fit(model_workflow, data = wr_plays_train)
 
 ```
 
-
+# FIX THIS LATE -----------------------------------------------------------
 
 ```{r}
 predictions <- augment(fit_model, wr_plays_test) 
