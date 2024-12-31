@@ -100,7 +100,7 @@ plays_of_WR <- anti_join(plays_of_WR, deadplays, join_by(gameId, playId))
 
 ### Removing QB Sneaks
 ```{r}
-# remove QB sneaks from the data. This is okay to remove because QB sneaks are very predictable plays so the defense already knows the receiver isn't running a route. - There are still 40,438 reciever plays
+# remove QB sneaks from the data. This is okay to remove because QB sneaks are very predictable plays so the defense already knows the receiver isn't running a route. - There are still 40,438 receiver plays
 plays_of_WR <- plays_of_WR |> 
   filter(is.na(qbSneak) | qbSneak == FALSE)
 
@@ -120,6 +120,11 @@ plays_of_WR <- plays_of_WR |>
   mutate(routeRan = replace_na(routeRan, "NO ROUTE")) |> 
   select(gameId:teamAbbr, displayName, position, inMotionAtBallSnap:routeRan, playDescription:preSnapVisitorScore, absoluteYardlineNumber, offenseFormation:playClockAtSnap)
 ```
+
+```{r}
+#write.csv(plays_of_WR, "wr_plays.csv")
+```
+
 
 
 # Creating play by play data of all offensive players on prediction plays -------------------
@@ -143,48 +148,27 @@ predicting_plays <- predicting_plays |>
 ```
 
 ```{r}
-# Players Positions - Include only position of each player, their name, and their NFLId
-all_positions <- players |> 
-  select(nflId, displayName, position)
+# Players Positions - Include only each player's nameand their NFLId
+player_names <- players |> 
+  select(nflId, displayName)
 
 # Adds name of player and their position to plays we are predicting 
-predicting_plays <- inner_join(predicting_plays, all_positions)
-
-#write.csv(predicting_plays, "offense_prediction_plays.csv")
+predicting_plays <- inner_join(predicting_plays, player_names)
 ```
 
-### ISSUES AT THIS POINT!!!  
-
 ```{r}
-#predicting_plays <- predicting_plays |>
+predicting_plays <- predicting_plays |>
   mutate(motioned = ifelse(!is.na(inMotionAtBallSnap), "Yes", "No")) # NAs represent players that never motioned at all
 ```
 
 ```{r}
 # plays of players where they were set at the line
-#predicting_plays <- predicting_plays |> 
-  mutate(set_at_line = ifelse(!is.na(motionSinceLineset), "Yes", "No"))
-```
-
-# Update WR Data ----------------------------------
-
-```{r}
-plays_of_WR <- predicting_plays |> 
-  filter(position == "WR")
+predicting_plays <- predicting_plays |> 
+  mutate(eligible_motion = ifelse(!is.na(motionSinceLineset), "Yes", "No"))
 ```
 
 # Write CSVs -------------------------------------------
 
 ```{r}
-# write.csv(predicting_plays, "offense_prediction_plays.csv")
+#write.csv(predicting_plays, "offense_prediction_plays.csv")
 ```
-
-```{r}
-# write.csv(plays_of_WR, "wr_plays.csv")
-```
-
-```{r}
-predicting_plays |> 
-  count(position, inMotionAtBallSnap, motionSinceLineset)
-```
-

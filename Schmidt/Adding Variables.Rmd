@@ -1,0 +1,190 @@
+---
+title: "Adding Variables To Data"
+author: "Belle Schmidt"
+date: "2024-12-31"
+output: html_document
+---
+
+```{r}
+# reading in the packages necessary
+library(nflverse)
+library(nflreadr)
+library(nflplotR)
+library(ggplot2)
+library(tidyverse)
+library(gganimate)
+library(dplyr)
+library(gganimate)
+library(ggfootball)
+library(readr)
+```
+
+
+```{r}
+# reading in necessary data
+plays_of_WR <- read.csv("wr_plays.csv")
+predicting_plays <- read.csv("offense_prediction_plays.csv")
+tracking_week1 <- read.csv("tracking_week_1.csv")
+tracking_week2 <- read.csv("tracking_week_2.csv")
+tracking_week3 <- read.csv("tracking_week_3.csv")
+tracking_week4 <- read.csv("tracking_week_4.csv")
+tracking_week5 <- read.csv("tracking_week_5.csv")
+tracking_week6 <- read.csv("tracking_week_6.csv")
+tracking_week7 <- read.csv("tracking_week_7.csv")
+tracking_week8 <- read.csv("tracking_week_9.csv")
+```
+
+# Working With Tracking Data ---------------------------------------
+
+## Calculating Starting Position, Snap Position, and Distance Traveled From Starting Position to Snap Position For All Players
+```{r}
+# week 1 tracking data
+movement_week1 <- tracking_week1 |> 
+  filter(frameId == 1 | frameType == "SNAP") |> 
+  select(gameId:displayName, frameType, x, y) |> 
+  pivot_wider(names_from = frameType, values_from = x:y) |> 
+  rename(starting_position_x = x_BEFORE_SNAP,
+         starting_position_y = y_BEFORE_SNAP,
+         snap_position_x = x_SNAP,
+         snap_position_y = y_SNAP) |> 
+  mutate(distance_moved = sqrt((snap_position_x - starting_position_x) ** 2 + (snap_position_y - starting_position_y) ** 2))
+
+ # week 2 tracking data 
+movement_week2 <- tracking_week2 |> 
+  filter(frameId == 1 | frameType == "SNAP") |> 
+  select(gameId:displayName, frameType, x, y) |> 
+  pivot_wider(names_from = frameType, values_from = x:y) |> 
+  rename(starting_position_x = x_BEFORE_SNAP,
+         starting_position_y = y_BEFORE_SNAP,
+         snap_position_x = x_SNAP,
+         snap_position_y = y_SNAP) |> 
+  mutate(distance_moved = sqrt((snap_position_x - starting_position_x) ** 2 + (snap_position_y - starting_position_y) ** 2))
+
+ # week 3 tracking data 
+movement_week3 <- tracking_week3 |> 
+  filter(frameId == 1 | frameType == "SNAP") |> 
+  select(gameId:displayName, frameType, x, y) |> 
+  pivot_wider(names_from = frameType, values_from = x:y) |> 
+  rename(starting_position_x = x_BEFORE_SNAP,
+         starting_position_y = y_BEFORE_SNAP,
+         snap_position_x = x_SNAP,
+         snap_position_y = y_SNAP) |> 
+  mutate(distance_moved = sqrt((snap_position_x - starting_position_x) ** 2 + (snap_position_y - starting_position_y) ** 2))
+
+ # week 4 tracking data 
+movement_week4 <- tracking_week4 |> 
+  filter(frameId == 1 | frameType == "SNAP") |> 
+  select(gameId:displayName, frameType, x, y) |> 
+  pivot_wider(names_from = frameType, values_from = x:y) |> 
+  rename(starting_position_x = x_BEFORE_SNAP,
+         starting_position_y = y_BEFORE_SNAP,
+         snap_position_x = x_SNAP,
+         snap_position_y = y_SNAP) |> 
+  mutate(distance_moved = sqrt((snap_position_x - starting_position_x) ** 2 + (snap_position_y - starting_position_y) ** 2))
+
+ # week 5 tracking data 
+movement_week5 <- tracking_week5 |> 
+  filter(frameId == 1 | frameType == "SNAP") |> 
+  select(gameId:displayName, frameType, x, y) |> 
+  pivot_wider(names_from = frameType, values_from = x:y) |> 
+  rename(starting_position_x = x_BEFORE_SNAP,
+         starting_position_y = y_BEFORE_SNAP,
+         snap_position_x = x_SNAP,
+         snap_position_y = y_SNAP) |> 
+  mutate(distance_moved = sqrt((snap_position_x - starting_position_x) ** 2 + (snap_position_y - starting_position_y) ** 2))
+
+ # week 6 tracking data 
+movement_week6 <- tracking_week6 |> 
+  filter(frameId == 1 | frameType == "SNAP") |> 
+  select(gameId:displayName, frameType, x, y) |> 
+  pivot_wider(names_from = frameType, values_from = x:y) |> 
+  rename(starting_position_x = x_BEFORE_SNAP,
+         starting_position_y = y_BEFORE_SNAP,
+         snap_position_x = x_SNAP,
+         snap_position_y = y_SNAP) |> 
+  mutate(distance_moved = sqrt((snap_position_x - starting_position_x) ** 2 + (snap_position_y - starting_position_y) ** 2))
+
+ # week 7 tracking data 
+movement_week7 <- tracking_week7 |> 
+  filter(frameId == 1 | frameType == "SNAP") |> 
+  select(gameId:displayName, frameType, x, y) |> 
+  pivot_wider(names_from = frameType, values_from = x:y) |> 
+  rename(starting_position_x = x_BEFORE_SNAP,
+         starting_position_y = y_BEFORE_SNAP,
+         snap_position_x = x_SNAP,
+         snap_position_y = y_SNAP) |> 
+  mutate(distance_moved = sqrt((snap_position_x - starting_position_x) ** 2 + (snap_position_y - starting_position_y) ** 2))
+
+ # week 8 tracking data 
+movement_week8 <- tracking_week8 |> 
+  filter(frameId == 1 | frameType == "SNAP") |> 
+  select(gameId:displayName, frameType, x, y) |> 
+  pivot_wider(names_from = frameType, values_from = x:y) |> 
+  rename(starting_position_x = x_BEFORE_SNAP,
+         starting_position_y = y_BEFORE_SNAP,
+         snap_position_x = x_SNAP,
+         snap_position_y = y_SNAP) |> 
+  mutate(distance_moved = sqrt((snap_position_x - starting_position_x) ** 2 + (snap_position_y - starting_position_y) ** 2))
+
+movement_data <- rbind(movement_week1, movement_week2, movement_week3, movement_week4, movement_week5, movement_week6, movement_week7, movement_week8)
+
+#write.csv(movement_data, "movement_data.csv")
+```
+
+# Adding variables to WR play by play data (Errors in information right now) ---------------------------------
+
+## Adding position & distance variables to WR play by play data
+```{r}
+plays_of_WR <- plays_of_WR |> 
+  inner_join(movement_data)
+```
+
+## Add variable indicating whether or not the player motioned to WR play by play data
+```{r}
+plays_of_WR <- plays_of_WR |>
+  mutate(motioned = ifelse(!is.na(inMotionAtBallSnap), "Yes", "No")) # NAs represent players that didn't motion
+```
+
+## Add variable indicating whether or not the WR was elligible to motion to WR play by play data
+```{r}
+# plays of players where they were set at the line
+plays_of_WR <- plays_of_WR |> 
+  mutate(set_at_line = ifelse(!is.na(motionSinceLineset), "Yes", "No")) # NAs represent players that were not set at line
+```
+
+## Adding how many players motioned on a given play 
+
+```{r}
+plays_with_motion <- predicting_plays |> 
+  count(gameId, playId, motioned) |> 
+  filter(motioned == "Yes") |> 
+  select(-motioned) |> 
+  rename(num_players_motioned = n) 
+
+plays_of_WR <- plays_of_WR |> 
+  left_join(plays_with_motion) |> 
+  mutate(num_players_motioned = ifelse(is.na(num_players_motioned), 0, num_players_motioned))
+```
+
+
+## Adding score differential 
+
+```{r}
+plays_of_WR <- plays_of_WR |> 
+  
+  
+  
+plays_of_WR
+```
+
+```{r}
+#write.csv(plays_of_WR, "wr_model_data.csv")
+```
+
+# Adding variables to all offensive players play by play data --------------
+
+```{r}
+predicting_plays <- predicting_plays |> 
+  inner_join(movement_data)
+```
+

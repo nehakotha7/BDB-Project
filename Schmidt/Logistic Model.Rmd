@@ -1,0 +1,58 @@
+---
+title: "Predicting WR routes based using a logistic model"
+author: "Belle Schmidt"
+date: "2024-12-31"
+output: html_document
+---
+
+# Setting up The Document ------------------------------------------
+
+```{r}
+# loading in the packages necessary
+library(nflverse)
+library(nflreadr)
+library(nflplotR)
+library(ggplot2)
+library(tidyverse)
+library(gganimate)
+library(dplyr)
+library(gganimate)
+library(ggfootball)
+library(readr)
+library(glmnet)
+library(tidymodels)
+```
+
+```{r}
+# reading in necessary data
+wr_plays <- read.csv("wr_model_data.csv")
+
+wr_plays_for_model <- wr_plays |> 
+  filter(down == 1, yardsToGo == 10)
+```
+
+# Splitting the data for the model ------------------------------
+
+## Splitting to testing and training data
+```{r}
+set.seed(12345)
+wr_plays_split <- initial_split(wr_plays_for_model, prop = 0.8)
+
+wr_plays_train <- training(wr_plays_split)
+
+wr_plays_test <- testing(wr_plays_split)
+```
+
+## Come back and do bootstrapping
+
+# Building the model For 1st & 10 situations -------------------------
+
+```{r}
+logit_model <- multinom_reg(mode = "classification",
+                            engine = "nnet")
+
+
+
+model_recipe <- recipe(routeRan ~ nflId + inMotionAtBallSnap + shiftSinceLineset + MotionSinceLineset + quarter + gameClock + offenseFormation + )
+```
+
