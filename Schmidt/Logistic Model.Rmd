@@ -32,6 +32,8 @@ wr_plays_for_model <- wr_plays |>
   filter(down == 1, yardsToGo == 10)
 ```
 
+QUESTION: What are your thoughts on focusing on just one team?
+
 # Splitting the data for the model ------------------------------
 
 ## Splitting to testing and training data
@@ -49,7 +51,6 @@ wr_plays_test <- testing(wr_plays_split)
 # Building the model For 1st & 10 situations -------------------------
 
 ## Variable Selection (NEED TO GO BACK AND DO)
-
 
 ```{r}
 # Variable selection: best subsets regression
@@ -109,6 +110,8 @@ model_workflow <- workflow() |>
 fit_model <- fit(model_workflow, data = wr_plays_train)
 
 ```
+
+
 
 ```{r}
 predictions <- augment(fit_model, wr_plays_test) 

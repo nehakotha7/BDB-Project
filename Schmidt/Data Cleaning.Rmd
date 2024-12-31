@@ -121,6 +121,8 @@ plays_of_WR <- plays_of_WR |>
   select(gameId:teamAbbr, displayName, position, inMotionAtBallSnap:routeRan, playDescription:preSnapVisitorScore, absoluteYardlineNumber, offenseFormation:playClockAtSnap)
 ```
 
+Do you think including defensive variables such man vs zone coverage is worth including in our model? Because I know teams shift to read what type of defense the other team is in so technically that can be knowledge known prior to the play. 
+
 ```{r}
 #write.csv(plays_of_WR, "wr_plays.csv")
 ```
@@ -148,7 +150,7 @@ predicting_plays <- predicting_plays |>
 ```
 
 ```{r}
-# Players Positions - Include only each player's nameand their NFLId
+# Players Positions - Include only each player's name and their NFLId
 player_names <- players |> 
   select(nflId, displayName)
 
@@ -156,16 +158,22 @@ player_names <- players |>
 predicting_plays <- inner_join(predicting_plays, player_names)
 ```
 
+QUESTION #1: We ran into issues because the players data only told us each player’s primary position but we know that some people switched positions throughout the season. We initially wanted to make predictions based on which position shifted but because of the switching position, that doesn’t seem possible. Based on my research there were not a lot of wide receivers that played other positions. Do you think it's fair to predict the route of each player that is a WR primarily for each play they are involved in? Or will the switching positions cause issues for that? And what would your thoughts be on then only predicting based on receivers motion and TE motion? Maybe RB as well? 
+
 ```{r}
 predicting_plays <- predicting_plays |>
   mutate(motioned = ifelse(!is.na(inMotionAtBallSnap), "Yes", "No")) # NAs represent players that never motioned at all
 ```
 
+Question #2: inMotionAtBallSnap NAs seem to represent players that did not motion in the first place. But I found over 7,000 plays where all 11 players “motioned” and that is just impossible. Is it possible that this data is really just missing? 
+
 ```{r}
 # plays of players where they were set at the line
 predicting_plays <- predicting_plays |> 
-  mutate(set_on_line = ifelse(!is.na(motionSinceLineset), "Yes", "No"))
+  mutate(set_on_line = ifelse(!is.na(motionSinceLineset), "Yes", "No")) #NAs represent players that were not set on the line?
 ```
+
+QUESTION #3: For the motionSinceLineset variable, I just want to make sure we are interpreting that correctly. It is indicating whether or not the player motioned after the line set or if the player motioned from the line? Because there are people who have NAs for motionSinceLineset but True for inMotionAtBallSnap
 
 # Write CSVs -------------------------------------------
 

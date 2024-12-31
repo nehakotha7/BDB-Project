@@ -33,7 +33,8 @@ tracking_week4 <- read.csv("tracking_week_4.csv")
 tracking_week5 <- read.csv("tracking_week_5.csv")
 tracking_week6 <- read.csv("tracking_week_6.csv")
 tracking_week7 <- read.csv("tracking_week_7.csv")
-tracking_week8 <- read.csv("tracking_week_9.csv")
+tracking_week8 <- read.csv("tracking_week_8.csv")
+tracking_week9 <- read.csv("tracking_week_9.csv")
 ```
 
 # Working With Tracking Data ---------------------------------------
@@ -128,7 +129,18 @@ movement_week8 <- tracking_week8 |>
          snap_position_y = y_SNAP) |> 
   mutate(distance_moved = sqrt((snap_position_x - starting_position_x) ** 2 + (snap_position_y - starting_position_y) ** 2))
 
-movement_data <- rbind(movement_week1, movement_week2, movement_week3, movement_week4, movement_week5, movement_week6, movement_week7, movement_week8)
+ # week 9 tracking data 
+movement_week9 <- tracking_week9 |> 
+  filter(frameId == 1 | frameType == "SNAP") |> 
+  select(gameId:displayName, frameType, x, y) |> 
+  pivot_wider(names_from = frameType, values_from = x:y) |> 
+  rename(starting_position_x = x_BEFORE_SNAP,
+         starting_position_y = y_BEFORE_SNAP,
+         snap_position_x = x_SNAP,
+         snap_position_y = y_SNAP) |> 
+  mutate(distance_moved = sqrt((snap_position_x - starting_position_x) ** 2 + (snap_position_y - starting_position_y) ** 2))
+
+movement_data <- rbind(movement_week1, movement_week2, movement_week3, movement_week4, movement_week5, movement_week6, movement_week7, movement_week8, track_week9)
 
 #write.csv(movement_data, "movement_data.csv")
 
