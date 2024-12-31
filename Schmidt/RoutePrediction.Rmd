@@ -33,6 +33,8 @@ players <- read.csv("players.csv")
 plays <- read.csv("plays.csv")
 plays_of_WR <- read.csv("wr_plays.csv")
 offense_prediction_plays <- read.csv("offense_prediction_plays.csv")
+
+View(plays_of_WR)
 ```
 
 ```{r}

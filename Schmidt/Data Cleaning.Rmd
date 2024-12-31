@@ -153,14 +153,16 @@ predicting_plays <- inner_join(predicting_plays, all_positions)
 #write.csv(predicting_plays, "offense_prediction_plays.csv")
 ```
 
+### ISSUES AT THIS POINT!!!  
+
 ```{r}
-predicting_plays <- predicting_plays |>
+#predicting_plays <- predicting_plays |>
   mutate(motioned = ifelse(!is.na(inMotionAtBallSnap), "Yes", "No")) # NAs represent players that never motioned at all
 ```
 
 ```{r}
 # plays of players where they were set at the line
-predicting_plays <- predicting_plays |> 
+#predicting_plays <- predicting_plays |> 
   mutate(set_at_line = ifelse(!is.na(motionSinceLineset), "Yes", "No"))
 ```
 
@@ -180,3 +182,9 @@ plays_of_WR <- predicting_plays |>
 ```{r}
 # write.csv(plays_of_WR, "wr_plays.csv")
 ```
+
+```{r}
+predicting_plays |> 
+  count(position, inMotionAtBallSnap, motionSinceLineset)
+```
+
