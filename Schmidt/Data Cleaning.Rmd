@@ -164,7 +164,7 @@ predicting_plays <- predicting_plays |>
 ```{r}
 # plays of players where they were set at the line
 predicting_plays <- predicting_plays |> 
-  mutate(eligible_motion = ifelse(!is.na(motionSinceLineset), "Yes", "No"))
+  mutate(set_on_line = ifelse(!is.na(motionSinceLineset), "Yes", "No"))
 ```
 
 # Write CSVs -------------------------------------------

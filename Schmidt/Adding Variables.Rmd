@@ -24,6 +24,8 @@ library(readr)
 # reading in necessary data
 plays_of_WR <- read.csv("wr_plays.csv")
 predicting_plays <- read.csv("offense_prediction_plays.csv")
+games <- read.csv("games.csv")
+movement_data <- read.csv("movement_data.csv")
 tracking_week1 <- read.csv("tracking_week_1.csv")
 tracking_week2 <- read.csv("tracking_week_2.csv")
 tracking_week3 <- read.csv("tracking_week_3.csv")
@@ -129,6 +131,8 @@ movement_week8 <- tracking_week8 |>
 movement_data <- rbind(movement_week1, movement_week2, movement_week3, movement_week4, movement_week5, movement_week6, movement_week7, movement_week8)
 
 #write.csv(movement_data, "movement_data.csv")
+
+movement_data
 ```
 
 # Adding variables to WR play by play data (Errors in information right now) ---------------------------------
@@ -136,7 +140,7 @@ movement_data <- rbind(movement_week1, movement_week2, movement_week3, movement_
 ## Adding position & distance variables to WR play by play data
 ```{r}
 plays_of_WR <- plays_of_WR |> 
-  inner_join(movement_data)
+  inner_join(movement_data, by = c("gameId", "playId", "nflId", "displayName"))
 ```
 
 ## Add variable indicating whether or not the player motioned to WR play by play data
@@ -170,11 +174,14 @@ plays_of_WR <- plays_of_WR |>
 ## Adding score differential 
 
 ```{r}
+
+home_teams <- games |> 
+  select(gameId, homeTeamAbbr)
+
 plays_of_WR <- plays_of_WR |> 
-  
-  
-  
-plays_of_WR
+  inner_join(home_teams) |> 
+  mutate(home_team = ifelse(possessionTeam == homeTeamAbbr, "Yes", "No"),
+         score_differential = ifelse(possessionTeam == homeTeamAbbr, preSnapHomeScore - preSnapVisitorScore, preSnapVisitorScore - preSnapHomeScore)) 
 ```
 
 ```{r}

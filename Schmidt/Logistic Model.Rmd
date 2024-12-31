@@ -21,6 +21,7 @@ library(ggfootball)
 library(readr)
 library(glmnet)
 library(tidymodels)
+library(leaps)
 ```
 
 ```{r}
@@ -47,12 +48,87 @@ wr_plays_test <- testing(wr_plays_split)
 
 # Building the model For 1st & 10 situations -------------------------
 
+## Variable Selection (NEED TO GO BACK AND DO)
+
+
 ```{r}
+# Variable selection: best subsets regression
+best3 <- regsubsets(routeRan ~ nflId + inMotionAtBallSnap + shiftSinceLineset + motionSinceLineset + 
+                         quarter + offenseFormation + receiverAlignment + distance_moved + motioned + 
+                         set_at_line + num_players_motioned + score_differential, data = wr_plays_for_model, nbest = 3)
+out <- summary(best3)     # The summary calculates our criteria values so we should save it
+out
+
+# To get cleaner output, with criteria measures 
+Subsets <- as_tibble(out$which) %>%       # which tells us the variables in each model
+  mutate(R2 = round(out$rsq, 3),          
+         R2adj = round(out$adjr2, 3),
+         Cp = round(out$cp,1)) %>%
+  select(-1)
+print(Subsets, width = Inf, n = Inf)         
+
+# Sort the models from best3 by different criteria
+plot(best3)
+plot(best3, scale = "Cp")
+plot(best3, scale = "adjr2")
+```
+
+
+# Building Model -------------------------------------
+
+```{r}
+# Make sure the required libraries are loaded
+library(recipes)
+library(parsnip)  # for multinom_reg
+library(workflows)  # for workflow
+library(caret)
+
+# Define the multinomial regression model
 logit_model <- multinom_reg(mode = "classification",
                             engine = "nnet")
 
+# Create the recipe for preprocessing
+model_recipe <- recipe(routeRan ~ nflId + inMotionAtBallSnap + shiftSinceLineset + motionSinceLineset + 
+                         quarter + offenseFormation + receiverAlignment + distance_moved + motioned + 
+                         set_at_line + num_players_motioned + score_differential, 
+                         data = wr_plays_for_model) |> 
+  step_dummy(all_nominal(), -all_outcomes())
 
+# Prepare the recipe with the training data
+recipe_prepped <- prep(model_recipe, training = wr_plays_train)
 
-model_recipe <- recipe(routeRan ~ nflId + inMotionAtBallSnap + shiftSinceLineset + MotionSinceLineset + quarter + gameClock + offenseFormation + )
+# Apply the recipe to the test data
+transformed_wr_plays <- bake(recipe_prepped, new_data = wr_plays_test)
+
+# Define the workflow
+model_workflow <- workflow() |> 
+  add_recipe(model_recipe) |> 
+  add_model(logit_model)
+
+# Fit the model using the training data
+fit_model <- fit(model_workflow, data = wr_plays_train)
+
 ```
+
+```{r}
+predictions <- augment(fit_model, wr_plays_test) 
+
+predictions <- predictions |> 
+  mutate(routeRan = factor(routeRan))
+
+
+predictions |> 
+  yardstick::accuracy(routeRan, .pred_class)
+```
+
+```{r}
+library(vip)
+library(tune)
+library(NeuralNetTools)
+
+
+model_vip <- extract_fit_parsnip(fit_model) |> 
+  vip()
+```
+
 
