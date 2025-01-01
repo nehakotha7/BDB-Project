@@ -1,0 +1,94 @@
+---
+title: "RandomForest"
+date: "2025-01-01"
+output: html_document
+---
+
+# Setting up The Document ------------------------------------------
+
+```{r}
+# loading in the packages necessary
+library(nflverse)
+library(nflreadr)
+library(nflplotR)
+library(ggplot2)
+library(tidyverse)
+library(gganimate)
+library(dplyr)
+library(gganimate)
+library(ggfootball)
+library(readr)
+library(glmnet)
+library(tidymodels)
+library(leaps)
+library(ranger)
+library(vip)
+```
+
+```{r}
+# reading in necessary data
+wr_plays <- read.csv("wr_model_data.csv")
+
+#wr_plays_for_model <- wr_plays |> 
+#  filter(down == 1, yardsToGo == 10)
+```
+
+# Splitting the data for the model ------------------------------
+
+## Splitting to testing and training data
+```{r}
+set.seed(12345)
+wr_plays_split <- initial_split(wr_plays_for_model, prop = 0.8)
+
+wr_plays_train <- training(wr_plays_split)
+
+wr_plays_test <- testing(wr_plays_split)
+```
+
+
+```{r}
+# internet
+
+wr_plays$routeRan <- as.factor(wr_plays$routeRan)
+
+rf_WR_plays <- ranger(routeRan ~ offenseFormation + receiverAlignment + motioned,
+                   data = wr_plays, 
+                   num.trees = 500,
+                   mtry = 3,                      # Number of variables tried at each split
+                   importance = "impurity",
+                   classification = TRUE          # Specify classification task ?
+                   )
+
+# Evaluate the model
+# Predict on the test data
+predictions <- predict(rf_WR_plays, data = wr_plays)$predictions
+
+# Create a confusion matrix to evaluate performance
+confusion_matrix <- table(Predicted = predictions, Actual = wr_plays$routeRan)
+
+confusion_matrix
+
+# Calculate accuracy
+accuracy <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
+cat("Accuracy:", accuracy, "\n")
+```
+
+```{r}
+# CMSAC
+rf_WR_plays <- ranger(routeRan ~ offenseFormation + receiverAlignment + motioned,
+                   data = wr_plays, 
+                   num.trees = 500,
+                   mtry = 3,
+                   importance = "impurity")
+
+rf_WR_plays
+
+vip(rf_WR_plays)
+
+wr_plays |> 
+  mutate(pred = rf_WR_plays$predictions) |> 
+  summarize(rmse = sqrt(mean((latency - pred) ^ 2)))
+
+```
+
+# Perform model validation?? Cross validation?
