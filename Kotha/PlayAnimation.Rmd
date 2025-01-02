@@ -17,6 +17,9 @@ library(gganimate)
 library(ggfootball)
 library(ranger)
 library(caret) 
+```
+
+```{r}
 library(help = "nflreadr")
 ```
 
@@ -28,18 +31,18 @@ plays <- read.csv("plays.csv")
 ```
 
 ```{r}
-tracking_w_1 <- read.csv("tracking_week_1.csv")
-tracking_w_2 <- read.csv("tracking_week_2.csv")
-tracking_w_3 <- read.csv("tracking_week_3.csv")
-tracking_w_4 <- read.csv("tracking_week_4.csv")
-tracking_w_5 <- read.csv("tracking_week_5.csv")
-tracking_w_6 <- read.csv("tracking_week_6.csv")
-tracking_w_7 <- read.csv("tracking_week_7.csv")
-tracking_w_8 <- read.csv("tracking_week_8.csv")
-tracking_w_9 <- read.csv("tracking_week_9.csv")
+tracking_week1 <- read.csv("tracking_week_1.csv")
+tracking_week2 <- read.csv("tracking_week_2.csv")
+tracking_week3 <- read.csv("tracking_week_3.csv")
+tracking_week4 <- read.csv("tracking_week_4.csv")
+tracking_week5 <- read.csv("tracking_week_5.csv")
+tracking_week6 <- read.csv("tracking_week_6.csv")
+tracking_week7 <- read.csv("tracking_week_7.csv")
+tracking_week8 <- read.csv("tracking_week_8.csv")
+tracking_week9 <- read.csv("tracking_week_9.csv")
 ```
 
-# identify specific playId. determine play based on game clock and play description 
+# input information about a play to identify its specific playId. then, determine play based on game clock and play description 
 ```{r}
 # identify specific play to analyze
 specific_play <- plays |> 
@@ -54,7 +57,7 @@ specific_play
 # filter data for one singular play: find nflId's of all players on the field and the ball data for play animation.
 ```{r}
 # animation of MIA v CIN week 4, Q1 ----------------------------------
-MIA_CIN_play <- tracking_w_4 |> 
+MIA_CIN_play <- tracking_week4 |> 
   filter(
     gameId == 2022092900,
     club %in% c("MIA", "CIN"),
@@ -73,7 +76,7 @@ nfl_Ids <- players_on_field |>
 nfl_Ids
 
 # filter tracking data to include specific players for this play and time range
-MIA_CIN_play <- tracking_w_4 |> 
+MIA_CIN_play <- tracking_week4 |> 
   filter(
     gameId == 2022092900,  
     playId == 383, 
@@ -83,7 +86,7 @@ MIA_CIN_play <- tracking_w_4 |>
 MIA_CIN_play
 
 # filter for ball data
-ball_data <- tracking_w_4 |> 
+ball_data <- tracking_week4 |> 
   filter(
     gameId == 2022092900,
     playId == 383,
@@ -138,6 +141,47 @@ animate(animation_all_players, nframes = total_frames, fps = 25, duration = tota
         width = 800, height = 500, res = 150)
 ```
 
+# live line graph of player in motion's acceleration over time in play
+```{r}
+
+# Filter the data for this player
+player_data <- MIA_CIN_play |> 
+  filter(nflId == 48233) |> 
+  arrange(frameId)  # Ensure time is in order
+
+# Create an animated line graph for speed over time for the selected player
+animation_speed_plot <- ggplot(player_data, aes(x = frameId, y = s)) +
+  geom_line(color = "#00B5E2", linewidth = 0.5) +
+  geom_point(color = "red", size = 1.5) +  # Highlight the current point
+  labs(title = paste("Speed of Player", "displayName"), 
+       x = "Time (Frame ID)", 
+       y = "Speed (m/s)") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.title = element_text(size = 12)
+  ) +
+  transition_reveal(frameId)  # Gradually reveal the line as frameId increases
+
+animate(animation_speed_plot, nframes = total_frames, fps = 25, duration = total_frames / 10,
+        width = 800, height = 500, res = 150)
+
+```
+
+```{r}
+# Total number of frames in the animation
+total_frames <- length(unique(MIA_CIN_play$frameId))
+
+# Animate the player movement (the field animation)
+animate(animation_all_players, nframes = total_frames, fps = 25, duration = total_frames / 10,
+        width = 800, height = 500, res = 150)
+
+# Animate the acceleration plot (line graph animation)
+animate(acceleration_plot_animation, nframes = total_frames, fps = 25, duration = total_frames / 10,
+        width = 800, height = 500, res = 150)
+
+```
+
 # OLD CODE: includes full field view and arrows (orientation is incorrect)
 # animation of all players movement during the run play (1st Q, MIA vs. CIN, week 4)
 ```{r}
@@ -186,28 +230,9 @@ animate(animation_all_players, nframes = total_frames, fps = 25, duration = tota
         width = 800, height = 500, res = 150)
 ```
 
-```{r}
 # Get unique club names
-unique_clubs <- tracking_w_1 |> 
+```{r}
+unique_clubs <- tracking_week1 |> 
   select(club) |> 
   distinct()
 ```
-
-```{r}
-```
-
-
-```{r}
-```
-
-
-
-```{r}
-```
-
-```{r}
-```
-
-```{r}
-```
-
