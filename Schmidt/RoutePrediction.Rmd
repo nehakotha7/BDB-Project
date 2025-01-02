@@ -55,6 +55,7 @@ tracking_week8 <- read.csv("tracking_week_9.csv")
 
 ### Routes Ran -----------------
 
+
 ```{r}
 # The number of times and the proportion of the time each route is run by WR (Table)
 prop_route <- plays_of_WR |> 

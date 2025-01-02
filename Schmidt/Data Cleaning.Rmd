@@ -16,6 +16,7 @@ library(gganimate)
 library(dplyr)
 library(gganimate)
 library(ggfootball)
+library(stringr)
 ```
 
 ```{r}
@@ -40,7 +41,8 @@ tracking_week4 <- read.csv("tracking_week_4.csv")
 tracking_week5 <- read.csv("tracking_week_5.csv")
 tracking_week6 <- read.csv("tracking_week_6.csv")
 tracking_week7 <- read.csv("tracking_week_7.csv")
-tracking_week8 <- read.csv("tracking_week_9.csv")
+tracking_week8 <- read.csv("tracking_week_8.csv")
+tracking_week9 <- read.csv("tracking_week_9.csv")
 ```
 
 # Creating WR Play By Play Data For Prediction Plays --------------------------------------------
@@ -115,17 +117,118 @@ no_route_ran <- no_route_ran|>
 ```
 
 ### Replacing NAs with saying no route ran 
+
+```{r}
+plays_of_WR <- plays_of_WR |> 
+  mutate(routeRan = ifelse(pff_runPassOption == 1 & is.na(routeRan), "NO ROUTE", routeRan))
+```
+
+
+#### Figuring out which plays are run plays with no run pass option
+
+```{r}
+run_plays_week1 <- tracking_week1 |> 
+  filter(event == "handoff" | event == "run") |> 
+  distinct(gameId, playId) 
+
+run_plays_week2 <- tracking_week2 |> 
+  filter(event == "handoff" | event == "run") |> 
+  distinct(gameId, playId) 
+
+run_plays_week3 <- tracking_week3 |> 
+  filter(event == "handoff" | event == "run") |> 
+  distinct(gameId, playId) 
+
+run_plays_week4 <- tracking_week4 |> 
+  filter(event == "handoff" | event == "run") |> 
+  distinct(gameId, playId) 
+
+run_plays_week5 <- tracking_week5 |> 
+  filter(event == "handoff" | event == "run") |> 
+  distinct(gameId, playId) 
+
+run_plays_week6 <- tracking_week6 |> 
+  filter(event == "handoff" | event == "run") |> 
+  distinct(gameId, playId) 
+
+run_plays_week7 <- tracking_week7 |> 
+  filter(event == "handoff" | event == "run") |> 
+  distinct(gameId, playId) 
+
+run_plays_week8 <- tracking_week8 |> 
+  filter(event == "handoff" | event == "run") |> 
+  distinct(gameId, playId) 
+
+run_plays_week9 <- tracking_week9 |> 
+  filter(event == "handoff" | event == "run") |> 
+  distinct(gameId, playId)
+
+run_plays <- rbind(run_plays_week1, run_plays_week2, run_plays_week3, run_plays_week4, run_plays_week5, run_plays_week6, run_plays_week7, run_plays_week8, run_plays_week9)
+
+run_plays
+```
+
+
+
+```{r}
+
+play_by_play_runs <- 
+
+plays_of_WR <- plays_of_WR |> 
+  mutate(routeRan = ifelse(gameId %in% run_plays$gameId & playId %in% run_plays$playId & is.na(routeRan), "RUN BLOCK", routeRan))
+```
+
+```{r}
+mis_match <- plays_of_WR |> 
+  mutate(num_receivers_left = as.numeric(stringr::str_extract(receiverAlignment, "\\d{1}")),
+         num_receivers_right = as.numeric(stringr::str_extract(receiverAlignment, "(?<=x)[0-9]+")),
+         total_recievers = num_receivers_left + num_receivers_right) |> 
+  count(gameId, playId, total_recievers) |> 
+  filter(n > total_recievers)
+
+mis_match
+
+
+plays_of_WR |> 
+  filter(gameId %in% mis_match$gameId & playId %in% mis_match$playId)
+```
+
+
+
 ```{r}
 plays_of_WR <- plays_of_WR |> 
   mutate(routeRan = replace_na(routeRan, "NO ROUTE")) |> 
   select(gameId:teamAbbr, displayName, position, inMotionAtBallSnap:routeRan, playDescription:preSnapVisitorScore, absoluteYardlineNumber, offenseFormation:playClockAtSnap)
 ```
 
-Do you think including defensive variables such man vs zone coverage is worth including in our model? Because I know teams shift to read what type of defense the other team is in so technically that can be knowledge known prior to the play. 
-
 ```{r}
 #write.csv(plays_of_WR, "wr_plays.csv")
 ```
+
+# Tracking Data -------------------------------
+
+# Dealing with play where two frames have "line_set" moment
+```{r}
+plays_with_new_set_line <- tracking_week1 |> 
+  group_by(gameId, playId, nflId) |> 
+  filter(event == "line_set") |> 
+  summarise(num_times_set = n()) |> 
+  ungroup() |> 
+  filter(num_times_set == 2) |> 
+  distinct(gameId, playId)
+
+plays_with_new_set_line
+
+set_line_change <- tracking_week1 |> 
+  inner_join(plays_with_new_set_line)
+
+set_line_change
+
+tracking_week1 <- tracking_week1 |>
+  mutate(event = ifelse(gameId == 2022091103 & playId == 4434 & frameId == 4, "second_line_set", event))
+  
+```
+
 
 
 

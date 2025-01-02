@@ -1,0 +1,410 @@
+---
+title: "Data Cleaning 2"
+author: "Belle Schmidt"
+date: "2025-01-02"
+output: html_document
+---
+
+# Set Up ---------------------
+
+```{r}
+# reading in the packages necessary
+library(nflverse)
+library(nflreadr)
+library(nflplotR)
+library(ggplot2)
+library(tidyverse)
+library(gganimate)
+library(dplyr)
+library(gganimate)
+library(ggfootball)
+library(stringr)
+```
+
+```{r}
+# gives me more information about the nflreadr package
+library(help = "nflreadr")
+```
+
+```{r}
+# reading in dataset
+games <- read.csv("games.csv")
+player_play <- read.csv("player_play.csv")
+players <- read.csv("players.csv")
+plays <- read.csv("plays.csv")
+```
+
+```{r}
+# reading in week by week tracking data
+tracking_week1 <- read.csv("tracking_week_1.csv")
+tracking_week2 <- read.csv("tracking_week_2.csv")
+tracking_week3 <- read.csv("tracking_week_3.csv")
+tracking_week4 <- read.csv("tracking_week_4.csv")
+tracking_week5 <- read.csv("tracking_week_5.csv")
+tracking_week6 <- read.csv("tracking_week_6.csv")
+tracking_week7 <- read.csv("tracking_week_7.csv")
+tracking_week8 <- read.csv("tracking_week_8.csv")
+tracking_week9 <- read.csv("tracking_week_9.csv")
+```
+
+# Only including players on offense ------------------------------------------
+
+```{r}
+possessionTeam <- plays |> 
+  select(gameId, playId, possessionTeam)
+
+teamName <- player_play |> 
+  select(gameId, playId, nflId, teamAbbr)
+
+players_on_offense <- teamName |> 
+  inner_join(possessionTeam) |> 
+  filter(teamAbbr == possessionTeam) |> 
+  select(-teamAbbr, -possessionTeam)
+```
+
+```{r}
+tracking_week1 <- inner_join(tracking_week1, players_on_offense) 
+
+tracking_week2 <- inner_join(tracking_week2, players_on_offense)
+
+tracking_week3 <- inner_join(tracking_week3, players_on_offense)
+
+tracking_week4 <- inner_join(tracking_week4, players_on_offense)
+
+tracking_week5 <- inner_join(tracking_week5, players_on_offense)
+
+tracking_week6 <- inner_join(tracking_week6, players_on_offense)
+
+tracking_week7 <- inner_join(tracking_week7, players_on_offense)
+
+tracking_week8 <- inner_join(tracking_week8, players_on_offense)
+
+tracking_week9 <- inner_join(tracking_week9, players_on_offense)
+```
+
+# Excluding Certain Plays -------------------
+
+## Removing QB Spikes
+```{r}
+# Plays where the ball is not spiked 
+non_spikes <- plays |> 
+  filter(qbSpike == FALSE | is.na(qbSpike)) |> 
+  select(gameId, playId)
+
+tracking_week1 <- inner_join(tracking_week1, non_spikes)
+
+tracking_week2 <- inner_join(tracking_week2, non_spikes)
+
+tracking_week3 <- inner_join(tracking_week3, non_spikes)
+
+tracking_week4 <- inner_join(tracking_week4, non_spikes)
+
+tracking_week5 <- inner_join(tracking_week5, non_spikes)
+
+tracking_week6 <- inner_join(tracking_week6, non_spikes)
+
+tracking_week7 <- inner_join(tracking_week7, non_spikes)
+
+tracking_week8 <- inner_join(tracking_week8, non_spikes)
+
+tracking_week9 <- inner_join(tracking_week9, non_spikes)
+```
+
+## Removing QB Kneel Plays
+
+```{r}
+kneels <- plays |> 
+  filter(qbKneel == 1) |> 
+  select(gameId, playId)
+
+tracking_week1 <- anti_join(tracking_week1, kneels)
+
+tracking_week2 <- anti_join(tracking_week2, kneels)
+
+tracking_week3 <- anti_join(tracking_week3, kneels)
+
+tracking_week4 <- anti_join(tracking_week4, kneels)
+
+tracking_week5 <- anti_join(tracking_week5, kneels)
+
+tracking_week6 <- anti_join(tracking_week6, kneels)
+
+tracking_week7 <- anti_join(tracking_week7, kneels)
+
+tracking_week8 <- anti_join(tracking_week8, kneels)
+
+tracking_week9 <- anti_join(tracking_week9, kneels)
+```
+
+## Removing QB Sneaks
+```{r}
+# remove QB sneaks from the data. This is okay to remove because QB sneaks are very predictable plays so the defense already knows the receiver isn't running a route. - There are still 40,438 receiver plays
+non_sneaks <- plays |> 
+  filter(is.na(qbSneak) | qbSneak == FALSE) |> 
+  select(gameId, playId)
+
+tracking_week1 <- inner_join(tracking_week1, non_sneaks)
+
+tracking_week2 <- inner_join(tracking_week2, non_sneaks)
+
+tracking_week3 <- inner_join(tracking_week3, non_sneaks)
+
+tracking_week4 <- inner_join(tracking_week4, non_sneaks)
+
+tracking_week5 <- inner_join(tracking_week5, non_sneaks)
+
+tracking_week6 <- inner_join(tracking_week6, non_sneaks)
+
+tracking_week7 <- inner_join(tracking_week7, non_sneaks)
+
+tracking_week8 <- inner_join(tracking_week8, non_sneaks)
+
+tracking_week9 <- inner_join(tracking_week9, non_sneaks)
+```
+
+# Dealing with play where two frames have "line_set" moment  ------------------------
+
+```{r}
+# Only occurred on one play in week 1
+plays_with_new_set_line_week1 <- tracking_week1 |> 
+  group_by(gameId, playId, nflId) |> 
+  filter(event == "line_set") |> 
+  summarise(num_times_set = n()) |> 
+  ungroup() |> 
+  filter(num_times_set == 2) |> 
+  distinct(gameId, playId)
+
+set_line_change_week1 <- tracking_week1 |> 
+  inner_join(plays_with_new_set_line_week1) |> 
+  distinct(gameId, playId)
+
+set_line_change_week1
+
+tracking_week1 <- tracking_week1 |>
+  mutate(event = ifelse(gameId == 2022091103 & playId == 4434 & frameId == 4, "second_line_set", event))
+```
+
+# Only including players that are elligible receivers -----------------------------------
+
+## Setting up the data to determine which players are eligible receivers 
+```{r}
+# Add the home team variable to the tracking data
+home_teams <- games |> 
+  distinct(gameId, homeTeamAbbr)
+
+tracking_week1 <- inner_join(tracking_week1, home_teams)
+
+tracking_week2 <- inner_join(tracking_week2, home_teams)
+
+tracking_week3 <- inner_join(tracking_week3, home_teams)
+
+tracking_week4 <- inner_join(tracking_week4, home_teams)
+
+tracking_week5 <- inner_join(tracking_week5, home_teams)
+
+tracking_week6 <- inner_join(tracking_week6, home_teams)
+
+tracking_week7 <- inner_join(tracking_week7, home_teams)
+
+tracking_week8 <- inner_join(tracking_week8, home_teams)
+
+tracking_week9 <- inner_join(tracking_week9, home_teams)
+```
+
+```{r}
+# add the absolute yard line,  number of receivers, and number of receivers on the left and right side variables to the tracking data (created receiver variables)
+important_variables <- plays |> 
+  mutate(num_receivers_left = as.numeric(stringr::str_extract(receiverAlignment, "\\d{1}")),
+         num_receivers_right = as.numeric(stringr::str_extract(receiverAlignment, "(?<=x)[0-9]+")),
+         total_receivers = num_receivers_left + num_receivers_right) |> 
+  distinct(gameId, playId, absoluteYardlineNumber, total_receivers, num_receivers_left, num_receivers_right)
+
+
+tracking_week1 <- inner_join(tracking_week1, important_variables)
+
+tracking_week2 <- inner_join(tracking_week2, important_variables)
+
+tracking_week3 <- inner_join(tracking_week3, important_variables)
+
+tracking_week4 <- inner_join(tracking_week4, important_variables)
+
+tracking_week5 <- inner_join(tracking_week5, important_variables)
+
+tracking_week6 <- inner_join(tracking_week6, important_variables)
+
+tracking_week7 <- inner_join(tracking_week7, important_variables)
+
+tracking_week8 <- inner_join(tracking_week8, important_variables)
+
+tracking_week9 <- inner_join(tracking_week9, important_variables)
+```
+
+```{r}
+# determine the absolute yard line that the player is at (absolute yard line meaning the distance from front of end zone for possession team)
+
+
+#tracking_week1 <- 
+
+
+tracking_week1|> 
+  mutate(yardLine = ifelse(playDirection == "right", 100 - (x - 10), x - 10),
+         absoluteYardlineNumber = absoluteYardlineNumber - 10)
+
+tracking_week2 <- tracking_week2 |> 
+  mutate(yardLine = ifelse(playDirection == "right", 100 - (x - 10), x - 10),
+         absoluteYardlineNumber = absoluteYardlineNumber - 10)
+
+tracking_week3 <- tracking_week3 |> 
+  mutate(yardLine = ifelse(playDirection == "right", 100 - (x - 10), x - 10),
+         absoluteYardlineNumber = absoluteYardlineNumber - 10)
+         
+tracking_week4 <- tracking_week4 |> 
+  mutate(yardLine = ifelse(playDirection == "right", 100 - (x - 10), x - 10),
+         absoluteYardlineNumber = absoluteYardlineNumber - 10)
+
+tracking_week5 <- tracking_week5 |> 
+  mutate(yardLine = ifelse(playDirection == "right", 100 - (x - 10), x - 10),
+         absoluteYardlineNumber = absoluteYardlineNumber - 10)
+
+tracking_week6 <- tracking_week6 |> 
+  mutate(yardLine = ifelse(playDirection == "right", 100 - (x - 10), x - 10),
+         absoluteYardlineNumber = absoluteYardlineNumber - 10)
+
+tracking_week7 <- tracking_week7 |> 
+  mutate(yardLine = ifelse(playDirection == "right", 100 - (x - 10), x - 10),
+         absoluteYardlineNumber = absoluteYardlineNumber - 10)
+
+tracking_week8 <- tracking_week8 |> 
+  mutate(yardLine = ifelse(playDirection == "right", 100 - (x - 10), x - 10),
+         absoluteYardlineNumber = absoluteYardlineNumber - 10)
+
+tracking_week9 <- tracking_week9 |> 
+  mutate(yardLine = ifelse(playDirection == "right", 100 - (x - 10), x - 10),
+         absoluteYardlineNumber = absoluteYardlineNumber - 10)
+```
+
+## Figuring out which players are receivers
+
+```{r}
+errors <- tracking_week1 |> 
+  filter(event == "ball_snap",
+         absoluteYardlineNumber - yardLine < 0) |> 
+  distinct(gameId, playId) 
+
+tracking_week1 |> 
+  inner_join(errors) |> 
+  distinct(gameId, club, homeTeamAbbr)
+```
+
+
+```{r}
+careful_plays <- plays |> 
+  filter(str_detect(tolower(playDescription), " eligible"))
+
+players_first_last <- players|> 
+  select(nflId, displayName) |> 
+  mutate(firstName = str_extract(displayName, "^\\S+"),
+         lastName = str_extract(displayName, "\\w+$")) 
+
+players_abbreviated_name <- players_first_last |> 
+  mutate(abbreviatedName = ifelse(displayName == "Deebo Samuel", "Deebo", NA),
+         abbreviatedName = ifelse(displayName == "Kyler Murray", displayName, abbreviatedName),
+         abbreviatedName = ifelse(displayName == "A.J. Brown", displayName, abbreviatedName))
+
+duplicate_last_name <- players_abbreviated_name |> 
+  filter(is.na(abbreviatedName)) |> 
+  count(lastName) |> 
+  filter(n > 1) |> 
+  select(lastName)
+
+duplicate_last_name
+
+unique_players <- players_abbreviated_name |> 
+  anti_join(duplicate_last_name) |> 
+  mutate(abbreviatedFirstName = paste0(str_extract(firstName, "^."), "."),
+         abbreviatedName = ifelse(is.na(abbreviatedName), paste(abbreviatedFirstName, lastName), abbreviatedName)) |> 
+  select(nflId:displayName, abbreviatedName)
+
+players_first_last |> 
+  inner_join(duplicate_last_name)
+
+```
+
+
+
+# Figuring out which plays are run plays with no run pass option
+
+```{r}
+run_plays_week1 <- tracking_week1 |> 
+  filter(event == "handoff" | event == "run") |> 
+  distinct(gameId, playId) 
+
+run_plays_week2 <- tracking_week2 |> 
+  filter(event == "handoff" | event == "run") |> 
+  distinct(gameId, playId) 
+
+run_plays_week3 <- tracking_week3 |> 
+  filter(event == "handoff" | event == "run") |> 
+  distinct(gameId, playId) 
+
+run_plays_week4 <- tracking_week4 |> 
+  filter(event == "handoff" | event == "run") |> 
+  distinct(gameId, playId) 
+
+run_plays_week5 <- tracking_week5 |> 
+  filter(event == "handoff" | event == "run") |> 
+  distinct(gameId, playId) 
+
+run_plays_week6 <- tracking_week6 |> 
+  filter(event == "handoff" | event == "run") |> 
+  distinct(gameId, playId) 
+
+run_plays_week7 <- tracking_week7 |> 
+  filter(event == "handoff" | event == "run") |> 
+  distinct(gameId, playId) 
+
+run_plays_week8 <- tracking_week8 |> 
+  filter(event == "handoff" | event == "run") |> 
+  distinct(gameId, playId) 
+
+run_plays_week9 <- tracking_week9 |> 
+  filter(event == "handoff" | event == "run") |> 
+  distinct(gameId, playId)
+
+run_plays <- rbind(run_plays_week1, run_plays_week2, run_plays_week3, run_plays_week4, run_plays_week5, run_plays_week6, run_plays_week7, run_plays_week8, run_plays_week9)
+
+run_plays
+```
+
+
+
+```{r}
+
+ <- 
+
+plays_of_WR <- plays_of_WR |> 
+  mutate(routeRan = ifelse(gameId %in% run_plays$gameId & playId %in% run_plays$playId & is.na(routeRan), "RUN BLOCK", routeRan))
+```
+
+```{r}
+mis_match <- plays_of_WR |> 
+  mutate(num_receivers_left = as.numeric(stringr::str_extract(receiverAlignment, "\\d{1}")),
+         num_receivers_right = as.numeric(stringr::str_extract(receiverAlignment, "(?<=x)[0-9]+")),
+         total_recievers = num_receivers_left + num_receivers_right) |> 
+  count(gameId, playId, total_recievers) |> 
+  filter(n > total_recievers)
+
+mis_match
+
+
+plays_of_WR |> 
+  filter(gameId %in% mis_match$gameId & playId %in% mis_match$playId)
+```
+
+### Replacing NAs with saying no route ran 
+
+```{r}
+plays_of_WR <- plays_of_WR |> 
+  mutate(routeRan = ifelse(pff_runPassOption == 1 & is.na(routeRan), "NO ROUTE", routeRan))
+```
+
