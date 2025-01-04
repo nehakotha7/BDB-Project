@@ -50,7 +50,6 @@ specific_play <- plays |>
          defensiveTeam == 'SF', 
          quarter == 2, down == 1, 
          yardsToGo == 10, preSnapHomeScore==7, preSnapVisitorScore==3) 
-specific_play
 ```
 
 # PLAY ANIMATION
@@ -85,6 +84,9 @@ MIA_CIN_play <- tracking_week4 |>
 
 MIA_CIN_play
 
+MIA_CIN_play <- MIA_CIN_play|> 
+  left_join(plays |> select(gameId, playId, absoluteYardlineNumber), 
+            by = c("gameId", "playId"))
 # filter for ball data
 ball_data <- tracking_week4 |> 
   filter(
@@ -141,6 +143,75 @@ animate(animation_all_players, nframes = total_frames, fps = 25, duration = tota
         width = 800, height = 500, res = 150)
 ```
 
+##(after modeling is complete)
+# play animation: color of each eligible receiver changes based on their most likely route ran at that frame of the play
+```{r}
+# Define a color palette for each route-- change later
+route_colors <- c(
+  "ANGLE" = "#FF0000", "CORNER" = "#FF7F00", "CROSS" = "#FFFF00", 
+  "FLAT" = "#7FFF00", "GO" = "#00FF00", "HITCH" = "#00FFFF", 
+  "IN" = "#007FFF", "OUT" = "#0000FF", "POST" = "#7F00FF", 
+  "SCREEN" = "#FF00FF", "SLANT" = "#FF007F", "WHEEL" = "#BFBFBF", 
+  "NO ROUTE" = "#000000"
+)
+
+# Generate predictions for each frame (mock example)
+# Replace this with actual predictions from your model
+test_MIA_CIN_play <- MIA_CIN_play |> 
+  mutate(
+    predicted_route = sample(c("ANGLE", "CORNER", "CROSS", "FLAT", "GO", "HITCH", "IN", "OUT", "POST", "SCREEN", "SLANT", "WHEEL", "NO ROUTE"), 
+                             n(), replace = TRUE)
+  )
+
+# Assuming model is trained and stored in `prediction_model`
+# Replace the placeholder code with actual predictions
+#MIA_CIN_play <- MIA_CIN_play |> 
+#  mutate(
+#    predicted_route = predict(prediction_model, newdata = MIA_CIN_play)
+#  )
+
+animation_all_players <- ggfootball(left_endzone = "#00B5E2", right_endzone = "#FF5F00", field_alpha = 0.8) +
+  
+  # plot all players positions over time as points
+  geom_point(data = test_MIA_CIN_play, 
+             aes(x = x, y = y, fill = predicted_route), size = 2, shape = 21, color = "black", stroke = 0.5, show.legend = TRUE) + 
+  # add labels for jersey numbers
+  geom_text(data = test_MIA_CIN_play, 
+            aes(x = x, y = y, label = jerseyNumber, color = "black"),
+            size = 3, vjust = -1, show.legend = FALSE) +
+  # add the ball
+  geom_point(data = ball_data, 
+             aes(x = x, y = y), size = 1, shape = 23, fill = "brown", color = "black", stroke = 0.5, show.legend = FALSE) +
+  
+  # Add dynamic fill scale for predicted routes
+  scale_fill_manual(values = route_colors, name = "Predicted Route") +
+  # set theme and limits for the plot
+  coord_fixed(xlim = c(55, 95), ylim = c(15, 55)) + 
+  labs(title = "Player Movements During MIA vs. CIN Pass Play",
+       subtitle = "Frame: {frame_time}") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0),
+    plot.subtitle = element_text(hjust = 0),
+    axis.title = element_blank(),   
+    axis.text = element_blank(),    
+    axis.ticks = element_blank()
+  )
+
+# create the animation with transition by frameId
+animation_all_players <- animation_all_players + 
+  transition_time(frameId) +  # animate based on frameId
+  ease_aes('linear') 
+
+# display animation with proper frames per second 
+total_frames <- length(unique(test_MIA_CIN_play$frameId))
+animate(animation_all_players, nframes = total_frames, fps = 25, duration = total_frames / 10,
+        width = 800, height = 500, res = 150)
+
+
+```
+
+
 # live line graph of player in motion's acceleration over time in play
 ```{r}
 
@@ -181,6 +252,7 @@ animate(acceleration_plot_animation, nframes = total_frames, fps = 25, duration 
         width = 800, height = 500, res = 150)
 
 ```
+
 
 # OLD CODE: includes full field view and arrows (orientation is incorrect)
 # animation of all players movement during the run play (1st Q, MIA vs. CIN, week 4)
