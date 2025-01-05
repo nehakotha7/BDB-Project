@@ -474,3 +474,12 @@ finished_plays <- finished_plays |>
 ```
 
 
+### Selecting on variables to include in the model
+
+```{r}
+players_predicting <- finished_plays |> 
+  filter(receiver_in_alignment == TRUE) 
+
+write.csv(players_predicting, "players_predicting.csv")
+```
+
