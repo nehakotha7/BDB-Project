@@ -403,8 +403,11 @@ finished_plays <- finished_plays |>
 ## Adding variable 
 
 ```{r}
-finished_plays_more_info <- finished_plays |> 
+finished_plays <- finished_plays |> 
   mutate(receiver_in_alignment = ifelse(receiver_in_left_alignment == TRUE | receiver_in_right_alignment == TRUE, TRUE, FALSE)) |> 
+  mutate(dist_from_line_of_scrimmage = abs(yardsTillTouchdown - yardlines_to_go))
+
+finished_plays_more_info <- finished_plays |>  
   filter(receiver_in_alignment == TRUE,
          frameType == "SNAP") |> 
   group_by(gameId, playId) |> 
@@ -413,10 +416,18 @@ finished_plays_more_info <- finished_plays |>
     receiver_number = ifelse(playDirection == "left" & left_or_right == "left", row_number(), NA),
     receiver_number = ifelse(playDirection == "left" & left_or_right == "right", total_receivers_in_alignment - (row_number() - 1), receiver_number),
     receiver_number = ifelse(playDirection == "right" & left_or_right == "left", total_receivers_in_alignment - (row_number() - 1), receiver_number),
-    receiver_number = ifelse(playDirection == "right" & left_or_right == "right", row_number(), receiver_number)) |> 
+    receiver_number = ifelse(playDirection == "right" & left_or_right == "right", row_number(), receiver_number),
+    receiver_number = paste(left_or_right, receiver_number)) |> 
   ungroup() |> 
-  mutate(dist_from_line_of_scrimmage = abs(yardsTillTouchdown - yardlines_to_go))
-  
+  select(gameId, playId, nflId, receiver_number)
+
+finished_plays_more_info_whole <- inner_join(finished_plays, finished_plays_more_info)
+
+finished_plays_more_info2 <- finished_plays |>
+  filter(receiver_in_alignment == FALSE) |> 
+  mutate(receiver_number = NA)
+
+finished_plays <- rbind(finished_plays_more_info_whole, finished_plays_more_info2)
   
 ```
 
