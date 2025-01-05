@@ -51,7 +51,7 @@ tracking_week9 <- read.csv("tracking_week_9.csv")
 
 ```{r}
 possessionTeam <- plays |> 
-  select(gameId, playId, possessionTeam)
+  select(gameId, playId, possessionTeam, quarter, down, yardsToGo, offenseFormation)
 
 teamName <- player_play |> 
   select(gameId, playId, nflId, teamAbbr, routeRan, motionSinceLineset, inMotionAtBallSnap, shiftSinceLineset)
@@ -184,23 +184,38 @@ tracking_week1 <- tracking_week1 |>
   mutate(event = ifelse(gameId == 2022091103 & playId == 4434 & frameId == 4, "second_line_set", event))
 ```
 
-# Only including players that are elligible receivers -----------------------------------
+# Identifying which players are included in the receiver alignment  -----------------------------------
 
-## Setting up the data to determine which players are eligible receivers 
+## Setting up the data to determine which players are included in the receiver alignment 
+
+### Adding official position as a variable
+```{r}
+official_position <- players |> 
+  select(nflId, position) |> 
+  rename(official_position = position)
+
+tracking_week1 <- inner_join(tracking_week1, official_position)
+tracking_week2 <- inner_join(tracking_week2, official_position)
+tracking_week3 <- inner_join(tracking_week3, official_position)
+tracking_week4 <- inner_join(tracking_week4, official_position)
+tracking_week5 <- inner_join(tracking_week5, official_position)
+tracking_week6 <- inner_join(tracking_week6, official_position)
+tracking_week7 <- inner_join(tracking_week7, official_position)
+tracking_week8 <- inner_join(tracking_week8, official_position)
+tracking_week9 <- inner_join(tracking_week9, official_position)
+```
 
 ### Adding variables indicating how many receivers lined up on the each side of the line, how many total receivers, and how far the line of scrimmage is from the end zone they are trying to score in 
 ```{r}
 # add the absolute yard line (ranging 0 to 100),  number of receivers, and number of receivers on the left and right side variables to the tracking data (created receiver variables)
 important_variables <- plays |> 
-  mutate(num_receivers_left_temp = as.numeric(stringr::str_extract(receiverAlignment, "\\d{1}")),
-         num_receivers_right_temp = as.numeric(stringr::str_extract(receiverAlignment, "(?<=x)[0-9]+")),
-         total_receivers = num_receivers_left_temp + num_receivers_right_temp,
-         absoluteYardLine = ifelse(possessionTeam != yardlineSide, yardlineNumber, 100 - yardlineNumber),  # makes it so the yard line variable is how far they are from their the end zone they are scoring in 
-         absoluteYardLine = ifelse(yardlineNumber == 50, 50, absoluteYardLine),
-         absoluteYardlineNumber = absoluteYardlineNumber - 10,
-         num_receivers_left = ifelse(absoluteYardlineNumber == absoluteYardLine, num_receivers_left_temp, num_receivers_right_temp),
-         num_receivers_right = ifelse(absoluteYardlineNumber == absoluteYardLine, num_receivers_right_temp, num_receivers_left_temp)) |> 
-  select(gameId, playId, absoluteYardLine, total_receivers, num_receivers_left, num_receivers_right)
+  mutate(num_receivers_one_side = as.numeric(stringr::str_extract(receiverAlignment, "\\d{1}")),
+         num_receivers_other_side = as.numeric(stringr::str_extract(receiverAlignment, "(?<=x)[0-9]+")),
+         total_receivers_in_alignment = num_receivers_one_side + num_receivers_other_side,
+         yardsTillTouchdown = ifelse(possessionTeam != yardlineSide, yardlineNumber, 100 - yardlineNumber),  # makes it so the yard line variable is how far they are from their the end zone they are scoring in 
+         yardsTillTouchdown = ifelse(yardlineNumber == 50, 50, yardsTillTouchdown),
+         absoluteYardlineNumber = absoluteYardlineNumber - 10) |> 
+  select(gameId, playId, yardsTillTouchdown, total_receivers_in_alignment, num_receivers_one_side, num_receivers_other_side, preSnapHomeScore, preSnapVisitorScore)
 
 tracking_week1 <- inner_join(tracking_week1, important_variables)
 
@@ -222,704 +237,190 @@ tracking_week9 <- inner_join(tracking_week9, important_variables)
 
 ```
 
-### Creating a variable that indicates how far they are from the end zone they are trying to score in at the snap (rounded and not) 
+
+### Creating a variable that indicates how far the players are from the end zone they are trying to score in at the snap (rounded and not) 
 ```{r}
 
-# Figuring out what yard line people are on at the snap
+adding_player_x_position <- function(week_num){
+  week_num |> 
+  mutate(yardlines_to_go = ifelse(playDirection == "left" & frameType == "SNAP", round(x - 10), NA),
+         exact_yards_to_go = ifelse(playDirection == "left" & frameType == "SNAP", x - 10, NA),
+         yardlines_to_go = ifelse(playDirection == "right" & frameType == "SNAP", 100 - round(x - 10), round(exact_yards_to_go)), 
+         exact_yards_to_go = ifelse(playDirection == "right" & frameType == "SNAP", 100 - (x - 10), exact_yards_to_go),
+         yardlines_to_go = ifelse(frameType == "SNAP" & yardsTillTouchdown > exact_yards_to_go, yardsTillTouchdown, yardlines_to_go))  # all of these were off by less than a yard
+}
 
-tracking_week1 <- tracking_week1 |> 
-  mutate(yardLine_rounded = ifelse(playDirection == "left" & frameType == "SNAP", round(x - 10), NA),
-         yardLine = ifelse(playDirection == "left" & frameType == "SNAP", x - 10, NA),
-         yardLine_rounded = ifelse(playDirection == "right" & frameType == "SNAP", 100 - round(x - 10), yardLine), 
-         yardLine = ifelse(playDirection == "right" & frameType == "SNAP", 100 - (x - 10), yardLine),
-         yardLine_rounded= ifelse(frameType == "SNAP" & absoluteYardLine > yardLine, absoluteYardLine, yardLine))  # all of these were off by less than a yard
+tracking_week1 <- adding_player_x_position(tracking_week1)
 
-tracking_week2 <- tracking_week2 |> 
-  mutate(yardLine_rounded = ifelse(playDirection == "left" & frameType == "SNAP", round(x - 10), NA),
-         yardLine = ifelse(playDirection == "left" & frameType == "SNAP", x - 10, NA),
-         yardLine_rounded = ifelse(playDirection == "right" & frameType == "SNAP", 100 - round(x - 10), yardLine), 
-         yardLine = ifelse(playDirection == "right" & frameType == "SNAP", 100 - (x - 10), yardLine),
-         yardLine_rounded= ifelse(frameType == "SNAP" & absoluteYardLine > yardLine, absoluteYardLine, yardLine))  # all of these were off by less than a yard
+tracking_week2 <- adding_player_x_position(tracking_week2)
 
-tracking_week3 <- tracking_week3 |> 
-  mutate(yardLine_rounded = ifelse(playDirection == "left" & frameType == "SNAP", round(x - 10), NA),
-         yardLine = ifelse(playDirection == "left" & frameType == "SNAP", x - 10, NA),
-         yardLine_rounded = ifelse(playDirection == "right" & frameType == "SNAP", 100 - round(x - 10), yardLine), 
-         yardLine = ifelse(playDirection == "right" & frameType == "SNAP", 100 - (x - 10), yardLine),
-         yardLine_rounded= ifelse(frameType == "SNAP" & absoluteYardLine > yardLine, absoluteYardLine, yardLine)) #  off by less than a yard or all eligible receivers already known 
+tracking_week3 <- adding_player_x_position(tracking_week3)
 
-tracking_week4 <- tracking_week4 |> 
-   mutate(yardLine_rounded = ifelse(playDirection == "left" & frameType == "SNAP", round(x - 10), NA),
-         yardLine = ifelse(playDirection == "left" & frameType == "SNAP", x - 10, NA),
-         yardLine_rounded = ifelse(playDirection == "right" & frameType == "SNAP", 100 - round(x - 10), yardLine), 
-         yardLine = ifelse(playDirection == "right" & frameType == "SNAP", 100 - (x - 10), yardLine),
-         yardLine_rounded= ifelse(frameType == "SNAP" & absoluteYardLine > yardLine, absoluteYardLine, yardLine)) # all of these were off by less than a yard
+tracking_week4 <- adding_player_x_position(tracking_week4)
 
-tracking_week5 <- tracking_week5 |> 
-  mutate(yardLine_rounded = ifelse(playDirection == "left" & frameType == "SNAP", round(x - 10), NA),
-         yardLine = ifelse(playDirection == "left" & frameType == "SNAP", x - 10, NA),
-         yardLine_rounded = ifelse(playDirection == "right" & frameType == "SNAP", 100 - round(x - 10), yardLine), 
-         yardLine = ifelse(playDirection == "right" & frameType == "SNAP", 100 - (x - 10), yardLine))
+tracking_week5 <- adding_player_x_position(tracking_week5)
 
-tracking_week6 <- tracking_week6 |> 
-   mutate(yardLine_rounded = ifelse(playDirection == "left" & frameType == "SNAP", round(x - 10), NA),
-         yardLine = ifelse(playDirection == "left" & frameType == "SNAP", x - 10, NA),
-         yardLine_rounded = ifelse(playDirection == "right" & frameType == "SNAP", 100 - round(x - 10), yardLine), 
-         yardLine = ifelse(playDirection == "right" & frameType == "SNAP", 100 - (x - 10), yardLine))
+tracking_week6 <- adding_player_x_position(tracking_week6)
 
-tracking_week7 <- tracking_week7 |> 
-  mutate(yardLine_rounded = ifelse(playDirection == "left" & frameType == "SNAP", round(x - 10), NA),
-         yardLine = ifelse(playDirection == "left" & frameType == "SNAP", x - 10, NA),
-         yardLine_rounded = ifelse(playDirection == "right" & frameType == "SNAP", 100 - round(x - 10), yardLine), 
-         yardLine = ifelse(playDirection == "right" & frameType == "SNAP", 100 - (x - 10), yardLine),
-         yardLine_rounded= ifelse(frameType == "SNAP" & absoluteYardLine > yardLine, absoluteYardLine, yardLine)) #  off by less than a yard
+tracking_week7 <- adding_player_x_position(tracking_week7)
 
-tracking_week8 <- tracking_week8 |> 
-  mutate(yardLine_rounded = ifelse(playDirection == "left" & frameType == "SNAP", round(x - 10), NA),
-         yardLine = ifelse(playDirection == "left" & frameType == "SNAP", x - 10, NA),
-         yardLine_rounded = ifelse(playDirection == "right" & frameType == "SNAP", 100 - round(x - 10), yardLine), 
-         yardLine = ifelse(playDirection == "right" & frameType == "SNAP", 100 - (x - 10), yardLine),
-         yardLine_rounded= ifelse(frameType == "SNAP" & absoluteYardLine > yardLine, absoluteYardLine, yardLine)) #  off by less than a yard
+tracking_week8 <- adding_player_x_position(tracking_week8)
 
-tracking_week9 <- tracking_week9 |> 
-   mutate(yardLine_rounded = ifelse(playDirection == "left" & frameType == "SNAP", round(x - 10), NA),
-         yardLine = ifelse(playDirection == "left" & frameType == "SNAP", x - 10, NA),
-         yardLine_rounded = ifelse(playDirection == "right" & frameType == "SNAP", 100 - round(x - 10), yardLine), 
-         yardLine = ifelse(playDirection == "right" & frameType == "SNAP", 100 - (x - 10), yardLine),
-         yardLine_rounded= ifelse(frameType == "SNAP" & absoluteYardLine > yardLine, absoluteYardLine, yardLine)) #  off by less than a yard
+tracking_week9 <- adding_player_x_position(tracking_week9)
 ```
 
-### Indicating which players for sure were receivers on the play
+### Indicating which player number they are (1 means furthest left and 11 means furthest right - on tracking data scale)
 ```{r}
-# identifying all players that ran routes as receivers
+player_numbers <- function(week_num){
+  week_num |> 
+    filter(frameType == "SNAP") |> 
+    group_by(gameId, playId) |> 
+    arrange(gameId, playId, y) |>
+    mutate(player_number = row_number()) |> 
+    ungroup() |> 
+    select(gameId, playId, nflId, player_number)
+  }
+ 
+tracking_week1 <- inner_join(tracking_week1, player_numbers(tracking_week1))
+tracking_week2 <- inner_join(tracking_week2, player_numbers(tracking_week2))
+tracking_week3 <- inner_join(tracking_week3, player_numbers(tracking_week3))
+tracking_week4 <- inner_join(tracking_week4, player_numbers(tracking_week4))
+tracking_week5 <- inner_join(tracking_week5, player_numbers(tracking_week5))
+tracking_week6 <- inner_join(tracking_week6, player_numbers(tracking_week6))
+tracking_week7 <- inner_join(tracking_week7, player_numbers(tracking_week7))
+tracking_week8 <- inner_join(tracking_week8, player_numbers(tracking_week8))
+tracking_week9 <- inner_join(tracking_week9, player_numbers(tracking_week9))
+```
 
-tracking_week1 <- tracking_week1 |>
-  mutate(receiver = ifelse(!is.na(routeRan), TRUE, NA)) 
+```{r}
 
-tracking_week2 <- tracking_week2 |>
-  mutate(receiver = ifelse(!is.na(routeRan), TRUE, NA))
+receiver_alignment <- function(num_week) {
+  num_week |> 
+    mutate(receiver_in_left_alignment = ifelse(player_number %in% c(1, 2, 3) & (!is.na(routeRan) | official_position %in% c("TE", "WR") & playDirection == "left"), TRUE, FALSE),
+           receiver_in_left_alignment = ifelse(player_number %in% c(9, 10, 11) & (!is.na(routeRan) | official_position %in% c("TE", "WR") & playDirection == "right"), TRUE, receiver_in_left_alignment),
+         receiver_in_right_alignment = ifelse(player_number %in% c(9, 10, 11) & (!is.na(routeRan) | official_position %in% c("TE", "WR") & playDirection == "left"), TRUE, FALSE),
+         receiver_in_right_alignment = ifelse(player_number %in% c(1, 2, 3) & (!is.na(routeRan) | official_position %in% c("TE", "WR") & playDirection == "right"), TRUE, receiver_in_right_alignment))
+}
 
-tracking_week3 <- tracking_week3 |>
-  mutate(receiver = ifelse(!is.na(routeRan), TRUE, NA))
+tracking_week1 <- receiver_alignment(tracking_week1)
+tracking_week2 <- receiver_alignment(tracking_week2)
+tracking_week3 <- receiver_alignment(tracking_week3)
+tracking_week4 <- receiver_alignment(tracking_week4)
+tracking_week5 <- receiver_alignment(tracking_week5)
+tracking_week6 <- receiver_alignment(tracking_week6)
+tracking_week7 <- receiver_alignment(tracking_week7)
+tracking_week8 <- receiver_alignment(tracking_week8)
+tracking_week9 <- receiver_alignment(tracking_week9)
 
-tracking_week4 <- tracking_week4 |>
-  mutate(receiver = ifelse(!is.na(routeRan), TRUE, NA))
+```
 
-tracking_week5 <- tracking_week5 |>
-  mutate(receiver = ifelse(!is.na(routeRan), TRUE, NA))
+```{r}
+finished_plays_playdID <- function(receiver_alignment_num_week) {
+  receiver_alignment_num_week |> 
+    filter(frameType == "SNAP",
+           receiver_in_left_alignment == TRUE | receiver_in_right_alignment == TRUE) |> 
+    count(gameId, playId, total_receivers_in_alignment) |> 
+    filter(n == total_receivers_in_alignment) |> 
+    select(gameId, playId)
+}
 
-tracking_week6 <- tracking_week6 |>
-  mutate(receiver = ifelse(!is.na(routeRan), TRUE, NA))
 
-tracking_week7 <- tracking_week7 |>
-  mutate(receiver = ifelse(!is.na(routeRan), TRUE, NA))
-
-tracking_week8 <- tracking_week8 |>
-  mutate(receiver = ifelse(!is.na(routeRan), TRUE, NA))
-
-tracking_week9 <- tracking_week9 |>
-  mutate(receiver = ifelse(!is.na(routeRan), TRUE, NA))
+finished_plays_week1 <- inner_join(tracking_week1, finished_plays_playdID(tracking_week1))
+finished_plays_week2 <- inner_join(tracking_week2, finished_plays_playdID(tracking_week2)) 
+finished_plays_week3 <- inner_join(tracking_week3, finished_plays_playdID(tracking_week3))
+finished_plays_week4 <- inner_join(tracking_week4, finished_plays_playdID(tracking_week4))
+finished_plays_week5 <- inner_join(tracking_week5, finished_plays_playdID(tracking_week5))
+finished_plays_week6 <- inner_join(tracking_week6, finished_plays_playdID(tracking_week6))
+finished_plays_week7 <- inner_join(tracking_week7, finished_plays_playdID(tracking_week7))
+finished_plays_week8 <- inner_join(tracking_week8, finished_plays_playdID(tracking_week8))
+finished_plays_week9 <- inner_join(tracking_week9, finished_plays_playdID(tracking_week9))
 ```
 
 
-### Subset Datasets (Plays with right number of receivers, not enough receivers, and too many receivers)
 ```{r}
-# making a subset of the data of all plays where all receivers are already identified (finished), all plays where there are not enough receivers identified (not_enough_wr), and all plays where there are too many identified receivers (too_many_wr)
+finished_plays <- rbind(finished_plays_week1, finished_plays_week2, finished_plays_week3, finished_plays_week4, finished_plays_week5, finished_plays_week6, finished_plays_week7, finished_plays_week8, finished_plays_week9)
 
-# week 1
-finished_plays_week1 <- tracking_week1 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers == num_receivers_identified) |> 
-  select(gameId, playId)
-
-not_enough_wr_plays_week1 <- tracking_week1 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers > num_receivers_identified) |> 
-  select(gameId, playId, num_receivers_identified)
-
-too_many_wr_plays_week1 <- tracking_week1 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers < num_receivers_identified) |> 
-  select(gameId, playId, num_receivers_identified)
-
-
-tracking_week1_finished <- inner_join(tracking_week1, finished_plays_week1) |> 
-  filter(frameType != "AFTER_SNAP") 
-
-tracking_week1_not_enough_wr <- inner_join(tracking_week1, not_enough_wr_plays_week1)
-
-tracking_week1_too_many_wr <- inner_join(tracking_week1, too_many_wr_plays_week1)
-
-# week 2
-finished_plays_week2 <- tracking_week2 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers == num_receivers_identified) |> 
-  select(gameId, playId)
-
-not_enough_wr_plays_week2 <- tracking_week2 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers > num_receivers_identified) |> 
-  select(gameId, playId, num_receivers_identified)
-
-too_many_wr_plays_week2 <- tracking_week2 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers < num_receivers_identified) |> 
-  select(gameId, playId, num_receivers_identified)
-
-
-tracking_week2_finished <- inner_join(tracking_week2, finished_plays_week2) |> 
-  filter(frameType != "AFTER_SNAP") 
-
-tracking_week2_not_enough_wr <- inner_join(tracking_week2, not_enough_wr_plays_week2)
-
-tracking_week2_too_many_wr <- inner_join(tracking_week2, too_many_wr_plays_week2)
-
-# week 3
-
-finished_plays_week3 <- tracking_week3 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers == num_receivers_identified) |> 
-  select(gameId, playId)
-
-not_enough_wr_plays_week3 <- tracking_week3 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers > num_receivers_identified) |> 
-  select(gameId, playId, num_receivers_identified)
-
-too_many_wr_plays_week3 <- tracking_week3 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers < num_receivers_identified) |> 
-  select(gameId, playId, num_receivers_identified)
-
-
-tracking_week3_finished <- inner_join(tracking_week3, finished_plays_week3) |> 
-  filter(frameType != "AFTER_SNAP") 
-
-tracking_week3_not_enough_wr <- inner_join(tracking_week3, not_enough_wr_plays_week3)
-
-tracking_week3_too_many_wr <- inner_join(tracking_week3, too_many_wr_plays_week3)
-
-# week 4
-finished_plays_week4 <- tracking_week4 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers == num_receivers_identified) |> 
-  select(gameId, playId)
-
-not_enough_wr_plays_week4 <- tracking_week4 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers > num_receivers_identified) |> 
-  select(gameId, playId, num_receivers_identified)
-
-too_many_wr_plays_week4 <- tracking_week4 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers < num_receivers_identified) |> 
-  select(gameId, playId, num_receivers_identified)
-
-
-tracking_week4_finished <- inner_join(tracking_week4, finished_plays_week4) |> 
-  filter(frameType != "AFTER_SNAP") 
-
-tracking_week4_not_enough_wr <- inner_join(tracking_week4, not_enough_wr_plays_week4)
-
-tracking_week4_too_many_wr <- inner_join(tracking_week4, too_many_wr_plays_week4)
-
-# week 5
-finished_plays_week5 <- tracking_week5 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers == num_receivers_identified) |> 
-  select(gameId, playId)
-
-not_enough_wr_plays_week5 <- tracking_week5 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers > num_receivers_identified) |> 
-  select(gameId, playId, num_receivers_identified)
-
-too_many_wr_plays_week5 <- tracking_week5 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers < num_receivers_identified) |> 
-  select(gameId, playId, num_receivers_identified)
-
-
-tracking_week5_finished <- inner_join(tracking_week5, finished_plays_week5) |> 
-  filter(frameType != "AFTER_SNAP") 
-
-tracking_week5_not_enough_wr <- inner_join(tracking_week5, not_enough_wr_plays_week5)
-
-tracking_week5_too_many_wr <- inner_join(tracking_week5, too_many_wr_plays_week5)
-
-# week 6
-finished_plays_week6 <- tracking_week6 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers == num_receivers_identified) |> 
-  select(gameId, playId)
-
-not_enough_wr_plays_week6 <- tracking_week6 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers > num_receivers_identified) |> 
-  select(gameId, playId, num_receivers_identified)
-
-
-too_many_wr_plays_week6 <- tracking_week6 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers < num_receivers_identified) |> 
-  select(gameId, playId, num_receivers_identified)
-
-
-tracking_week6_finished <- inner_join(tracking_week6, finished_plays_week6) |> 
-  filter(frameType != "AFTER_SNAP") 
-
-tracking_week6_not_enough_wr <- inner_join(tracking_week6, not_enough_wr_plays_week6)
-
-tracking_week6_too_many_wr <- inner_join(tracking_week6, too_many_wr_plays_week6)
-
-# week 7
-
-finished_plays_week7 <- tracking_week7 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers == num_receivers_identified) |> 
-  select(gameId, playId)
-
-not_enough_wr_plays_week7 <- tracking_week7 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers > num_receivers_identified) |> 
-  select(gameId, playId, num_receivers_identified)
-
-too_many_wr_plays_week7 <- tracking_week7 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers < num_receivers_identified) |> 
-  select(gameId, playId, num_receivers_identified)
-
-
-tracking_week7_finished <- inner_join(tracking_week7, finished_plays_week7) |> 
-  filter(frameType != "AFTER_SNAP") 
-
-tracking_week7_not_enough_wr <- inner_join(tracking_week7, not_enough_wr_plays_week7)
-
-tracking_week7_too_many_wr <- inner_join(tracking_week7, too_many_wr_plays_week7)
-
-
-# week 8
-
-finished_plays_week8 <- tracking_week8 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers == num_receivers_identified) |> 
-  select(gameId, playId)
-
-not_enough_wr_plays_week8 <- tracking_week8 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers > num_receivers_identified) |> 
-  select(gameId, playId, num_receivers_identified)
-
-too_many_wr_plays_week8 <- tracking_week8 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers < num_receivers_identified) |> 
-  select(gameId, playId, num_receivers_identified)
-
-
-tracking_week8_finished <- inner_join(tracking_week8, finished_plays_week8) |> 
-  filter(frameType != "AFTER_SNAP") 
-
-tracking_week8_not_enough_wr <- inner_join(tracking_week8, not_enough_wr_plays_week8)
-
-tracking_week8_too_many_wr <- inner_join(tracking_week8, too_many_wr_plays_week8)
-
-# week 9
-
-finished_plays_week9 <- tracking_week9 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers == num_receivers_identified) |> 
-  select(gameId, playId)
-
-not_enough_wr_plays_week9 <- tracking_week9 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers > num_receivers_identified) |> 
-  select(gameId, playId, num_receivers_identified)
-
-too_many_wr_plays_week9 <- tracking_week9 |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  count(gameId, playId, total_receivers) |> 
-  rename(num_receivers_identified = n) |> 
-  filter(total_receivers < num_receivers_identified) |> 
-  select(gameId, playId, num_receivers_identified)
-
-
-tracking_week9_finished <- inner_join(tracking_week9, finished_plays_week9) |> 
-  filter(frameType != "AFTER_SNAP") 
-
-tracking_week9_not_enough_wr <- inner_join(tracking_week9, not_enough_wr_plays_week9)
-
-tracking_week9_too_many_wr <- inner_join(tracking_week9, too_many_wr_plays_week9)
-```
-
-### Identifying recievers on plays where the number of players that ran routes does not match receiver allignment ---------------------------
-
-```{r}
-# all plays where the not only receivers on the line were identified/ not enough wr were identified
-
-not_enough_wr_plays <- rbind(tracking_week1_not_enough_wr, tracking_week2_not_enough_wr, tracking_week3_not_enough_wr, tracking_week4_not_enough_wr, tracking_week5_not_enough_wr, tracking_week6_not_enough_wr, tracking_week7_not_enough_wr, tracking_week8_not_enough_wr, tracking_week9_not_enough_wr) 
-
-too_many_wr_plays <- rbind(tracking_week1_too_many_wr, tracking_week2_too_many_wr, tracking_week3_too_many_wr, tracking_week4_too_many_wr, tracking_week5_too_many_wr, tracking_week6_too_many_wr, tracking_week7_too_many_wr, tracking_week8_too_many_wr, tracking_week9_too_many_wr) 
-```
-
-#### Plays with one extra receiver ------------------------
-
-```{r}
-# identifies which plays only had one extra receiver and who the possible receivers are
-one_extra_wr_plays <- too_many_wr_plays |> 
-  filter(frameType == "SNAP",
-         !is.na(routeRan)) |> 
-  mutate(dist_from_line = abs(absoluteYardLine - yardLine),
-         diff_in_receivers = num_receivers_identified - total_receivers) |> 
-  filter(diff_in_receivers == 1)
-
-# adds position variable
-positions <- players |> 
-  select(nflId, position)
-
-one_extra_wr_plays <- inner_join(one_extra_wr_plays, positions)
-
-# identifies how many total plays have one extra receiver - 4,701
-one_extra_wr_plays |> 
+# there are 11,140 distinct plays
+finished_plays |> 
   distinct(gameId, playId)
 
-# identify how many rb ran routes with plays with one extra receiver
-num_rb_on_play <- one_extra_wr_plays |> 
-  filter(position == "RB")|> 
+messed_left_up <- finished_plays |> 
+  filter(receiver_in_left_alignment == "TRUE",
+         frameType == "SNAP") |> 
+  count(gameId, playId, num_receivers_one_side, num_receivers_other_side) |> 
+  filter(n != num_receivers_other_side & n != num_receivers_one_side) |> 
+  select(gameId, playId)
+
+finished_plays <- anti_join(finished_plays, messed_left_up) 
+  
+# 10,956 plays left - or not?
+finished_plays |> 
+  distinct(gameId, playId)
+  
+```
+
+# Adding Variables ------------------------
+
+## Adding Score Differential 
+
+```{r}
+home_teams <- games |> 
+  select(gameId, homeTeamAbbr)
+
+finished_plays <- finished_plays |> 
+  inner_join(home_teams) |> 
+  mutate(score_differential = ifelse(club == homeTeamAbbr, preSnapHomeScore - preSnapVisitorScore, preSnapVisitorScore - preSnapHomeScore)) |> 
+  select(-homeTeamAbbr, -preSnapHomeScore, -preSnapVisitorScore)
+```
+
+## Addding a variable `moved` indicating if they moved after their line was set
+
+```{r}
+finished_plays <- finished_plays |> 
+  mutate(moved = ifelse(shiftSinceLineset == TRUE | inMotionAtBallSnap == TRUE | motionSinceLineset == TRUE, TRUE, FALSE)) 
+```
+
+## Adding a variable `num_players_moved` indicating how many players moved on the play
+
+```{r}
+num_players_moved <- finished_plays |> 
+  filter(moved == TRUE,
+         frameType == "SNAP") |> 
   count(gameId, playId) |> 
-  rename(num_rb = n) 
+  rename(num_players_moved = n)
+
+no_movement <- finished_plays |> 
+  anti_join(num_players_moved) |> 
+  distinct(gameId, playId) |> 
+  mutate(num_players_moved = 0)
+
+num_players_moved <- rbind(num_players_moved, no_movement)
+
+finished_plays <- finished_plays |> 
+  inner_join(num_players_moved)
 ```
 
-##### Plays with one running back 
+## Adding variable 
 
 ```{r}
-# only include plays with 1 running back on play - 4,473 
-one_rb_plays <- num_rb_on_play |> 
-  filter(num_rb == 1) |> 
-  select(-num_rb)
-
-finished_one_rb_plays <- one_extra_wr_plays |> 
-  inner_join(one_rb_plays) |> 
-  mutate(receiver_in_alignment = ifelse(position == "RB", FALSE, TRUE))
-```
-
-##### Plays with two running backs 
-
-```{r}
-# fixing plays with one extra receiver and two RB
-
-two_rb_plays <- num_rb_on_play |> 
-  filter(num_rb == 2) |> 
-  select(-num_rb)
-
-fixing_plays <- one_extra_wr_plays |> 
-  inner_join(two_rb_plays)
-
-# rb who were not receivers 
-non_receivers_part1 <- fixing_plays |> 
-  filter(num_receivers_left == 1) |> 
-  arrange(y) |> 
+finished_plays_more_info <- finished_plays |> 
+  mutate(receiver_in_alignment = ifelse(receiver_in_left_alignment == TRUE | receiver_in_right_alignment == TRUE, TRUE, FALSE)) |> 
+  filter(receiver_in_alignment == TRUE,
+         frameType == "SNAP") |> 
   group_by(gameId, playId) |> 
-  slice(2) |> 
-  filter(position == "RB")
-
-non_receivers_part2 <- fixing_plays |> 
-  filter(num_receivers_left == 2) |> 
-  arrange(y) |> 
-  group_by(gameId, playId) |> 
-  slice(3) |> 
-  filter(position == "RB")
-
-non_receivers_part3 <- fixing_plays |> 
-  filter(num_receivers_left == 3) |> 
-  arrange(y) |> 
-  group_by(gameId, playId) |> 
-  slice(4) |> 
-  filter(position == "RB")
-
-non_receivers <- rbind(non_receivers_part1, non_receivers_part2, non_receivers_part3) |> 
-  mutate(receiver_in_alignment = FALSE)
-
-fixed_play_num <- non_receivers |> 
-  distinct(gameId, playId)
-
-fixed_plays <- fixing_plays |> 
-  inner_join(fixed_play_num)
-
-
- 
-fixing_plays |> 
-  filter(num_receivers_left == 1) |> 
-  arrange(gameId, playId, y)
-
-motion_plays_w_two_rb <- fixing_plays |> 
-  filter(motionSinceLineset == TRUE) |> 
-  distinct(gameId, playId)
-  
-two_rb_no_motion <- anti_join(fixing_plays, motion_plays_w_two_rb)
-  
-rb_right_most <- two_rb_no_motion|> 
-  group_by(gameId, playId) |> 
-  slice_max(y, n = 1) |> 
-  filter(position == "RB") |> 
-  distinct(gameId, playId)
-
-fixing_plays |> 
-  inner_join(rb_right_most) |> 
-  select(gameId, playId, y, position, dist_from_line, num_receivers_right, total_receivers, inMotionAtBallSnap, motionSinceLineset) |> 
-  arrange(gameId, playId, y) 
-```
-
-
-```{r}
-
-fixing_plays <- fixing_plays |> 
-  group_by(gameId, playId, position) |> 
-  mutate(obs_index = row_number()) |> 
+  arrange(gameId, playId, y) |> 
+  mutate(left_or_right = ifelse(receiver_in_left_alignment == TRUE, "left", "right"),
+    receiver_number = ifelse(playDirection == "left" & left_or_right == "left", row_number(), NA),
+    receiver_number = ifelse(playDirection == "left" & left_or_right == "right", total_receivers_in_alignment - (row_number() - 1), receiver_number),
+    receiver_number = ifelse(playDirection == "right" & left_or_right == "left", total_receivers_in_alignment - (row_number() - 1), receiver_number),
+    receiver_number = ifelse(playDirection == "right" & left_or_right == "right", row_number(), receiver_number)) |> 
   ungroup() |> 
-  mutate(receiver_in_alignment = ifelse(position == "RB", NA, TRUE))
-
-identifying_rb_wr <- fixing_plays |> 
-  select(gameId, playId, position, dist_from_line, obs_index, y) |> 
-  pivot_wider(
-    names_from = c(position, obs_index), 
-    values_from = c(dist_from_line, y),  
-    names_sep = "_")
- 
-
-identifying_rb_wr
-
-identifying_rb1_wr <- identifying_rb_wr|> 
-  mutate(diff_rb = dist_from_line_RB_1 - dist_from_line_RB_2) |> 
-  filter(diff_rb < -2) 
-
-identifying_rb1_wr
-
-
-fixed_plays_part1 <- fixing_plays |> 
-  inner_join(identifying_rb1_wr) |> 
-  mutate(receiver_in_alignment = ifelse(position == "RB" & obs_index == 1, TRUE, receiver_in_alignment))
-
-identifying_rb2_wr <- identifying_rb_wr|> 
-  mutate(diff_rb = dist_from_line_RB_1 - dist_from_line_RB_2) |> 
-  filter(diff_rb > 2) |> 
-  distinct(gameId, playId)
-
-
+  mutate(dist_from_line_of_scrimmage = abs(yardsTillTouchdown - yardlines_to_go))
   
   
-fixing_plays |> 
-  inner_join(adding_number) |> 
-  select(gameId, playId, y, position, )
-  
-  
-  
-identifying_rb_wr <- pivot_wider(names_from = position, values_from = dist_from_line)
-  group_by(gameId, playId, ) |> 
-  summarise(mean_dist = mean(dist_from_line))
-
-|> 
-  mutat
-  distinct(gameId, playId)
-  
-  
-  
-  mutate(receiver_in_alignment = ifelse(position != "RB", TRUE, NA)) |> 
-  
-  
-
-
-#|> 
-  mutate(receiver_in_alignment = ifelse(position == "RB", FALSE, TRUE))
 ```
 
 
 
-```{r}
-careful_plays <- plays |> 
-  filter(str_detect(tolower(playDescription), " eligible"))
 
-players_first_last <- players|> 
-  select(nflId, displayName) |> 
-  mutate(firstName = str_extract(displayName, "^\\S+"),
-         lastName = str_extract(displayName, "\\w+$")) 
-
-players_abbreviated_name <- players_first_last |> 
-  mutate(abbreviatedName = ifelse(displayName == "Deebo Samuel", "Deebo", NA),
-         abbreviatedName = ifelse(displayName == "Kyler Murray", displayName, abbreviatedName),
-         abbreviatedName = ifelse(displayName == "A.J. Brown", displayName, abbreviatedName))
-
-duplicate_last_name <- players_abbreviated_name |> 
-  filter(is.na(abbreviatedName)) |> 
-  count(lastName) |> 
-  filter(n > 1) |> 
-  select(lastName)
-
-duplicate_last_name
-
-unique_players <- players_abbreviated_name |> 
-  anti_join(duplicate_last_name) |> 
-  mutate(abbreviatedFirstName = paste0(str_extract(firstName, "^."), "."),
-         abbreviatedName = ifelse(is.na(abbreviatedName), paste(abbreviatedFirstName, lastName), abbreviatedName)) |> 
-  select(nflId:displayName, abbreviatedName)
-
-players_first_last |> 
-  inner_join(duplicate_last_name)
-
-```
-
-
-# Figuring out which plays are run plays with no run pass option
-
-```{r}
-run_plays_week1 <- tracking_week1 |> 
-  filter(event == "handoff" | event == "run") |> 
-  distinct(gameId, playId) 
-
-run_plays_week2 <- tracking_week2 |> 
-  filter(event == "handoff" | event == "run") |> 
-  distinct(gameId, playId) 
-
-run_plays_week3 <- tracking_week3 |> 
-  filter(event == "handoff" | event == "run") |> 
-  distinct(gameId, playId) 
-
-run_plays_week4 <- tracking_week4 |> 
-  filter(event == "handoff" | event == "run") |> 
-  distinct(gameId, playId) 
-
-run_plays_week5 <- tracking_week5 |> 
-  filter(event == "handoff" | event == "run") |> 
-  distinct(gameId, playId) 
-
-run_plays_week6 <- tracking_week6 |> 
-  filter(event == "handoff" | event == "run") |> 
-  distinct(gameId, playId) 
-
-run_plays_week7 <- tracking_week7 |> 
-  filter(event == "handoff" | event == "run") |> 
-  distinct(gameId, playId) 
-
-run_plays_week8 <- tracking_week8 |> 
-  filter(event == "handoff" | event == "run") |> 
-  distinct(gameId, playId) 
-
-run_plays_week9 <- tracking_week9 |> 
-  filter(event == "handoff" | event == "run") |> 
-  distinct(gameId, playId)
-
-run_plays <- rbind(run_plays_week1, run_plays_week2, run_plays_week3, run_plays_week4, run_plays_week5, run_plays_week6, run_plays_week7, run_plays_week8, run_plays_week9)
-
-run_plays
-```
-
-
-
-```{r}
-
- <- 
-
-plays_of_WR <- plays_of_WR |> 
-  mutate(routeRan = ifelse(gameId %in% run_plays$gameId & playId %in% run_plays$playId & is.na(routeRan), "RUN BLOCK", routeRan))
-```
-
-```{r}
-mis_match <- plays_of_WR |> 
-  mutate(num_receivers_left = as.numeric(stringr::str_extract(receiverAlignment, "\\d{1}")),
-         num_receivers_right = as.numeric(stringr::str_extract(receiverAlignment, "(?<=x)[0-9]+")),
-         total_recievers = num_receivers_left + num_receivers_right) |> 
-  count(gameId, playId, total_recievers) |> 
-  filter(n > total_recievers)
-
-mis_match
-
-
-plays_of_WR |> 
-  filter(gameId %in% mis_match$gameId & playId %in% mis_match$playId)
-```
-
-### Replacing NAs with saying no route ran 
-
-```{r}
-plays_of_WR <- plays_of_WR |> 
-  mutate(routeRan = ifelse(pff_runPassOption == 1 & is.na(routeRan), "NO ROUTE", routeRan))
-```
 
