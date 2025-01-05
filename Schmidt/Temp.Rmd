@@ -1,0 +1,14 @@
+---
+title: "Temp Doc"
+author: "Belle Schmidt"
+date: "2025-01-05"
+output: html_document
+---
+```{r}
+library(readr)
+
+players_predicing <- read.csv("players_predicting.csv")
+
+
+```
+
