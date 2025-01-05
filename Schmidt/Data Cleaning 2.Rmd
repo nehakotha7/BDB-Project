@@ -354,7 +354,7 @@ messed_left_up <- finished_plays |>
 
 finished_plays <- anti_join(finished_plays, messed_left_up) 
   
-# 10,956 plays left - or not?
+# 10,956 plays left 
 finished_plays |> 
   distinct(gameId, playId)
   
@@ -430,6 +430,47 @@ finished_plays_more_info2 <- finished_plays |>
 
 finished_plays <- rbind(finished_plays_more_info_whole, finished_plays_more_info2)
   
+```
+
+## Replacing NAs for routeRan
+
+### If run or pass option then if the receiver did not run a route routeRan = NO ROUTE
+
+```{r}
+run_pass_option <- plays |> 
+  select(gameId, playId, pff_runPassOption)
+
+finished_plays <- inner_join(finished_plays, run_pass_option)
+
+
+finished_plays <- finished_plays |> 
+  mutate(routeRan = ifelse(receiver_in_alignment == TRUE & pff_runPassOption == 1 & is.na(routeRan), "NO ROUTE", routeRan)) 
+
+```
+
+### If the play was a hand off or run play and not pff_runPassOption then routeRan = RUN BLOCK
+
+```{r}
+finished_plays <- finished_plays |> 
+  mutate(routeRan = ifelse((event == "handoff" | event == "run") & pff_runPassOption == 0 & is.na(routeRan), "RUN BLOCK", routeRan))
+```
+
+### If it is a pass play and did not run route then NO ROUTE
+```{r}
+finished_plays |> 
+  filter(receiver_in_alignment == TRUE, 
+         frameType == "SNAP",
+         is.na(routeRan)) 
+
+pass_plays <- plays |> 
+  mutate(pass = ifelse(is.na(passResult), FALSE, TRUE)) |> 
+  select(gameId, playId, pass)
+
+
+finished_plays <- inner_join(finished_plays, pass_plays)
+
+finished_plays <- finished_plays |> 
+  mutate(routeRan = ifelse(pass == TRUE & is.na(routeRan), "NO ROUTE", routeRan))
 ```
 
 
