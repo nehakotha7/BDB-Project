@@ -377,7 +377,8 @@ finished_plays <- finished_plays |>
 
 ```{r}
 finished_plays <- finished_plays |> 
-  mutate(moved = ifelse(shiftSinceLineset == TRUE | inMotionAtBallSnap == TRUE | motionSinceLineset == TRUE, TRUE, FALSE)) 
+  mutate(moved = ifelse(shiftSinceLineset == TRUE | inMotionAtBallSnap == TRUE | motionSinceLineset == TRUE, TRUE, FALSE),
+         moved = ifelse(is.na(moved), FALSE, TRUE)) 
 ```
 
 ## Adding a variable `num_players_moved` indicating how many players moved on the play
