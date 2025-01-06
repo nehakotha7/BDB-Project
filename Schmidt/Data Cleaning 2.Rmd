@@ -474,6 +474,52 @@ finished_plays <- finished_plays |>
 ```
 
 
+### Adding Variables for number of receivers left for each play
+```{r}
+left_players <- players_predicting |>
+  filter(frameType == "SNAP",
+         receiver_in_left_alignment == TRUE) |> 
+  count(gameId, playId) |> 
+  rename(num_receivers_left = n)
+
+
+no_left_players <- players_predicting |> 
+  anti_join(left_players) |> 
+  distinct(gameId, playId) |> 
+  mutate(num_receivers_left = 0)
+
+left_players <- rbind(left_players, no_left_players)
+
+players_predicting <- inner_join(players_predicting, left_players)
+```
+
+### Adding Variables for number of receivers right for each play
+```{r}
+right_players <- players_predicting |>
+  filter(frameType == "SNAP",
+         receiver_in_right_alignment == TRUE) |> 
+  count(gameId, playId) |> 
+  rename(num_receivers_right = n)
+
+
+no_right_players <- players_predicting |> 
+  anti_join(right_players) |> 
+  distinct(gameId, playId) |> 
+  mutate(num_receivers_right = 0)
+
+right_players <- rbind(right_players, no_right_players)
+
+players_predicting <- inner_join(players_predicting, right_players)
+```
+
+### Making it so player number is always referring from left to right of alignment
+
+```{r}
+players_predicting |> 
+  mutate(player_number = ifelse(playDirection == "right", 12 - player_number, player_number))
+```
+
+
 ### Selecting only plays of players we are predicting
 
 ```{r}
@@ -483,4 +529,5 @@ players_predicting <- finished_plays |>
 
 write.csv(players_predicting, "players_predicting.csv")
 ```
+
 
