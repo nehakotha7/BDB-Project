@@ -1,0 +1,539 @@
+---
+title: "Data Cleaning 2"
+author: "Belle Schmidt"
+date: "2025-01-02"
+output: html_document
+---
+
+# Set Up ---------------------
+
+```{r}
+# reading in the packages necessary
+library(nflverse)
+library(nflreadr)
+library(nflplotR)
+library(ggplot2)
+library(tidyverse)
+library(gganimate)
+library(dplyr)
+library(gganimate)
+library(ggfootball)
+library(stringr)
+```
+
+```{r}
+# gives me more information about the nflreadr package
+library(help = "nflreadr")
+```
+
+```{r}
+# reading in dataset
+games <- read.csv("games.csv")
+player_play <- read.csv("player_play.csv")
+players <- read.csv("players.csv")
+plays <- read.csv("plays.csv")
+```
+
+```{r}
+# reading in week by week tracking data
+tracking_week1 <- read.csv("tracking_week_1.csv")
+tracking_week2 <- read.csv("tracking_week_2.csv")
+tracking_week3 <- read.csv("tracking_week_3.csv")
+tracking_week4 <- read.csv("tracking_week_4.csv")
+tracking_week5 <- read.csv("tracking_week_5.csv")
+tracking_week6 <- read.csv("tracking_week_6.csv")
+tracking_week7 <- read.csv("tracking_week_7.csv")
+tracking_week8 <- read.csv("tracking_week_8.csv")
+tracking_week9 <- read.csv("tracking_week_9.csv")
+```
+
+# Only including players on offense ------------------------------------------
+
+```{r}
+possessionTeam <- plays |> 
+  select(gameId, playId, possessionTeam, quarter, down, yardsToGo, offenseFormation)
+
+teamName <- player_play |> 
+  select(gameId, playId, nflId, teamAbbr, routeRan, motionSinceLineset, inMotionAtBallSnap, shiftSinceLineset)
+
+players_on_offense <- teamName |> 
+  inner_join(possessionTeam) |> 
+  filter(teamAbbr == possessionTeam) |> 
+  select(-teamAbbr, -possessionTeam)
+```
+
+```{r}
+tracking_week1 <- inner_join(tracking_week1, players_on_offense) 
+
+tracking_week2 <- inner_join(tracking_week2, players_on_offense)
+
+tracking_week3 <- inner_join(tracking_week3, players_on_offense)
+
+tracking_week4 <- inner_join(tracking_week4, players_on_offense)
+
+tracking_week5 <- inner_join(tracking_week5, players_on_offense)
+
+tracking_week6 <- inner_join(tracking_week6, players_on_offense)
+
+tracking_week7 <- inner_join(tracking_week7, players_on_offense)
+
+tracking_week8 <- inner_join(tracking_week8, players_on_offense)
+
+tracking_week9 <- inner_join(tracking_week9, players_on_offense)
+```
+
+# Excluding Certain Plays -------------------
+
+## Removing QB Spikes
+```{r}
+# Plays where the ball is not spiked 
+non_spikes <- plays |> 
+  filter(qbSpike == FALSE | is.na(qbSpike)) |> 
+  select(gameId, playId)
+
+tracking_week1 <- inner_join(tracking_week1, non_spikes)
+
+tracking_week2 <- inner_join(tracking_week2, non_spikes)
+
+tracking_week3 <- inner_join(tracking_week3, non_spikes)
+
+tracking_week4 <- inner_join(tracking_week4, non_spikes)
+
+tracking_week5 <- inner_join(tracking_week5, non_spikes)
+
+tracking_week6 <- inner_join(tracking_week6, non_spikes)
+
+tracking_week7 <- inner_join(tracking_week7, non_spikes)
+
+tracking_week8 <- inner_join(tracking_week8, non_spikes)
+
+tracking_week9 <- inner_join(tracking_week9, non_spikes)
+```
+
+## Removing QB Kneel Plays
+
+```{r}
+kneels <- plays |> 
+  filter(qbKneel == 1) |> 
+  select(gameId, playId)
+
+tracking_week1 <- anti_join(tracking_week1, kneels)
+
+tracking_week2 <- anti_join(tracking_week2, kneels)
+
+tracking_week3 <- anti_join(tracking_week3, kneels)
+
+tracking_week4 <- anti_join(tracking_week4, kneels)
+
+tracking_week5 <- anti_join(tracking_week5, kneels)
+
+tracking_week6 <- anti_join(tracking_week6, kneels)
+
+tracking_week7 <- anti_join(tracking_week7, kneels)
+
+tracking_week8 <- anti_join(tracking_week8, kneels)
+
+tracking_week9 <- anti_join(tracking_week9, kneels)
+```
+
+## Removing QB Sneaks
+```{r}
+# remove QB sneaks from the data. This is okay to remove because QB sneaks are very predictable plays so the defense already knows the receiver isn't running a route. - There are still 40,438 receiver plays
+non_sneaks <- plays |> 
+  filter(is.na(qbSneak) | qbSneak == FALSE) |> 
+  select(gameId, playId)
+
+tracking_week1 <- inner_join(tracking_week1, non_sneaks)
+
+tracking_week2 <- inner_join(tracking_week2, non_sneaks)
+
+tracking_week3 <- inner_join(tracking_week3, non_sneaks)
+
+tracking_week4 <- inner_join(tracking_week4, non_sneaks)
+
+tracking_week5 <- inner_join(tracking_week5, non_sneaks)
+
+tracking_week6 <- inner_join(tracking_week6, non_sneaks)
+
+tracking_week7 <- inner_join(tracking_week7, non_sneaks)
+
+tracking_week8 <- inner_join(tracking_week8, non_sneaks)
+
+tracking_week9 <- inner_join(tracking_week9, non_sneaks)
+```
+
+# Dealing with play where two frames have "line_set" moment  ------------------------
+
+```{r}
+# Only occurred on one play in week 1
+plays_with_new_set_line_week1 <- tracking_week1 |> 
+  group_by(gameId, playId, nflId) |> 
+  filter(event == "line_set") |> 
+  summarise(num_times_set = n()) |> 
+  ungroup() |> 
+  filter(num_times_set == 2) |> 
+  distinct(gameId, playId)
+
+set_line_change_week1 <- tracking_week1 |> 
+  inner_join(plays_with_new_set_line_week1) |> 
+  distinct(gameId, playId)
+
+set_line_change_week1
+
+tracking_week1 <- tracking_week1 |>
+  mutate(event = ifelse(gameId == 2022091103 & playId == 4434 & frameId == 4, "second_line_set", event))
+```
+
+# Identifying which players are included in the receiver alignment  -----------------------------------
+
+## Setting up the data to determine which players are included in the receiver alignment 
+
+### Adding official position as a variable
+```{r}
+official_position <- players |> 
+  select(nflId, position) |> 
+  rename(official_position = position)
+
+tracking_week1 <- inner_join(tracking_week1, official_position)
+tracking_week2 <- inner_join(tracking_week2, official_position)
+tracking_week3 <- inner_join(tracking_week3, official_position)
+tracking_week4 <- inner_join(tracking_week4, official_position)
+tracking_week5 <- inner_join(tracking_week5, official_position)
+tracking_week6 <- inner_join(tracking_week6, official_position)
+tracking_week7 <- inner_join(tracking_week7, official_position)
+tracking_week8 <- inner_join(tracking_week8, official_position)
+tracking_week9 <- inner_join(tracking_week9, official_position)
+```
+
+### Adding variables indicating how many receivers lined up on the each side of the line, how many total receivers, and how far the line of scrimmage is from the end zone they are trying to score in 
+```{r}
+# add the absolute yard line (ranging 0 to 100),  number of receivers, and number of receivers on the left and right side variables to the tracking data (created receiver variables)
+important_variables <- plays |> 
+  mutate(num_receivers_one_side = as.numeric(stringr::str_extract(receiverAlignment, "\\d{1}")),
+         num_receivers_other_side = as.numeric(stringr::str_extract(receiverAlignment, "(?<=x)[0-9]+")),
+         total_receivers_in_alignment = num_receivers_one_side + num_receivers_other_side,
+         yardsTillTouchdown = ifelse(possessionTeam != yardlineSide, yardlineNumber, 100 - yardlineNumber),  # makes it so the yard line variable is how far they are from their the end zone they are scoring in 
+         yardsTillTouchdown = ifelse(yardlineNumber == 50, 50, yardsTillTouchdown),
+         absoluteYardlineNumber = absoluteYardlineNumber - 10) |> 
+  select(gameId, playId, yardsTillTouchdown, total_receivers_in_alignment, num_receivers_one_side, num_receivers_other_side, preSnapHomeScore, preSnapVisitorScore)
+
+tracking_week1 <- inner_join(tracking_week1, important_variables)
+
+tracking_week2 <- inner_join(tracking_week2, important_variables)
+
+tracking_week3 <- inner_join(tracking_week3, important_variables)
+
+tracking_week4 <- inner_join(tracking_week4, important_variables)
+
+tracking_week5 <- inner_join(tracking_week5, important_variables)
+
+tracking_week6 <- inner_join(tracking_week6, important_variables)
+
+tracking_week7 <- inner_join(tracking_week7, important_variables)
+
+tracking_week8 <- inner_join(tracking_week8, important_variables)
+
+tracking_week9 <- inner_join(tracking_week9, important_variables)
+
+```
+
+
+### Creating a variable that indicates how far the players are from the end zone they are trying to score in (rounded and not) 
+```{r}
+
+adding_player_x_position <- function(week_num){
+  week_num |> 
+  mutate(yardlines_to_go = ifelse(playDirection == "left", round(x - 10), NA),
+         exact_yards_to_go = ifelse(playDirection == "left", x - 10, NA),
+         yardlines_to_go = ifelse(playDirection == "right", 100 - round(x - 10), yardlines_to_go), 
+         exact_yards_to_go = ifelse(playDirection == "right", 100 - (x - 10), exact_yards_to_go),
+         yardlines_to_go = ifelse(frameType == "SNAP" & (yardsTillTouchdown > yardlines_to_go), yardsTillTouchdown, yardlines_to_go))  # all of these were off by less than a yard
+}
+
+tracking_week1 <- adding_player_x_position(tracking_week1)
+
+tracking_week2 <- adding_player_x_position(tracking_week2)
+
+tracking_week3 <- adding_player_x_position(tracking_week3)
+
+tracking_week4 <- adding_player_x_position(tracking_week4)
+
+tracking_week5 <- adding_player_x_position(tracking_week5)
+
+tracking_week6 <- adding_player_x_position(tracking_week6)
+
+tracking_week7 <- adding_player_x_position(tracking_week7)
+
+tracking_week8 <- adding_player_x_position(tracking_week8)
+
+tracking_week9 <- adding_player_x_position(tracking_week9)
+```
+
+### Indicating which player number they are (1 means furthest left and 11 means furthest right - on tracking data scale)
+```{r}
+player_numbers <- function(week_num){
+  week_num |> 
+    group_by(gameId, playId, frameId) |> 
+    arrange(gameId, playId, frameId, y) |>
+    mutate(player_number = row_number()) |> 
+    ungroup() |> 
+    select(gameId, playId, nflId, frameId, player_number)
+  }
+ 
+tracking_week1 <- inner_join(tracking_week1, player_numbers(tracking_week1))
+tracking_week2 <- inner_join(tracking_week2, player_numbers(tracking_week2))
+tracking_week3 <- inner_join(tracking_week3, player_numbers(tracking_week3))
+tracking_week4 <- inner_join(tracking_week4, player_numbers(tracking_week4))
+tracking_week5 <- inner_join(tracking_week5, player_numbers(tracking_week5))
+tracking_week6 <- inner_join(tracking_week6, player_numbers(tracking_week6))
+tracking_week7 <- inner_join(tracking_week7, player_numbers(tracking_week7))
+tracking_week8 <- inner_join(tracking_week8, player_numbers(tracking_week8))
+tracking_week9 <- inner_join(tracking_week9, player_numbers(tracking_week9))
+```
+
+```{r}
+
+receiver_alignment <- function(num_week) {
+  num_week |> 
+    mutate(receiver_in_left_alignment = ifelse(player_number %in% c(1, 2, 3) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "left" & frameType == "SNAP", TRUE, FALSE),
+           receiver_in_left_alignment = ifelse(player_number %in% c(9, 10, 11) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "right" & frameType == "SNAP", TRUE, receiver_in_left_alignment),
+         receiver_in_right_alignment = ifelse(player_number %in% c(9, 10, 11) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "left" & frameType == "SNAP", TRUE, FALSE),
+         receiver_in_right_alignment = ifelse(player_number %in% c(1, 2, 3) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "right" & frameType == "SNAP", TRUE, receiver_in_right_alignment))
+}
+
+tracking_week1 <- receiver_alignment(tracking_week1)
+tracking_week2 <- receiver_alignment(tracking_week2)
+tracking_week3 <- receiver_alignment(tracking_week3)
+tracking_week4 <- receiver_alignment(tracking_week4)
+tracking_week5 <- receiver_alignment(tracking_week5)
+tracking_week6 <- receiver_alignment(tracking_week6)
+tracking_week7 <- receiver_alignment(tracking_week7)
+tracking_week8 <- receiver_alignment(tracking_week8)
+tracking_week9 <- receiver_alignment(tracking_week9)
+
+```
+
+```{r}
+finished_plays_playdID <- function(receiver_alignment_num_week) {
+  receiver_alignment_num_week |> 
+    filter(frameType == "SNAP",
+           receiver_in_left_alignment == TRUE | receiver_in_right_alignment == TRUE) |> 
+    count(gameId, playId, total_receivers_in_alignment) |> 
+    filter(n == total_receivers_in_alignment) |> 
+    select(gameId, playId)
+}
+
+
+finished_plays_week1 <- inner_join(tracking_week1, finished_plays_playdID(tracking_week1))
+finished_plays_week2 <- inner_join(tracking_week2, finished_plays_playdID(tracking_week2)) 
+finished_plays_week3 <- inner_join(tracking_week3, finished_plays_playdID(tracking_week3))
+finished_plays_week4 <- inner_join(tracking_week4, finished_plays_playdID(tracking_week4))
+finished_plays_week5 <- inner_join(tracking_week5, finished_plays_playdID(tracking_week5))
+finished_plays_week6 <- inner_join(tracking_week6, finished_plays_playdID(tracking_week6))
+finished_plays_week7 <- inner_join(tracking_week7, finished_plays_playdID(tracking_week7))
+finished_plays_week8 <- inner_join(tracking_week8, finished_plays_playdID(tracking_week8))
+finished_plays_week9 <- inner_join(tracking_week9, finished_plays_playdID(tracking_week9))
+```
+
+
+```{r}
+finished_plays <- rbind(finished_plays_week1, finished_plays_week2, finished_plays_week3, finished_plays_week4, finished_plays_week5, finished_plays_week6, finished_plays_week7, finished_plays_week8, finished_plays_week9)
+
+# there are 11,140 distinct plays
+finished_plays |> 
+  distinct(gameId, playId)
+
+messed_left_up <- finished_plays |> 
+  filter(receiver_in_left_alignment == "TRUE",
+         frameType == "SNAP") |> 
+  count(gameId, playId, num_receivers_one_side, num_receivers_other_side) |> 
+  filter(n != num_receivers_other_side & n != num_receivers_one_side) |> 
+  select(gameId, playId)
+
+finished_plays <- anti_join(finished_plays, messed_left_up) 
+  
+# 10,956 plays left 
+finished_plays |> 
+  distinct(gameId, playId)
+  
+```
+
+# Adding Variables ------------------------
+
+## Adding Score Differential 
+
+```{r}
+home_teams <- games |> 
+  select(gameId, homeTeamAbbr)
+
+finished_plays <- finished_plays |> 
+  inner_join(home_teams) |> 
+  mutate(score_differential = ifelse(club == homeTeamAbbr, preSnapHomeScore - preSnapVisitorScore, preSnapVisitorScore - preSnapHomeScore)) |> 
+  select(-homeTeamAbbr, -preSnapHomeScore, -preSnapVisitorScore)
+```
+
+## Addding a variable `moved` indicating if they moved after their line was set
+
+```{r}
+finished_plays <- finished_plays |> 
+  mutate(moved = ifelse(shiftSinceLineset == TRUE | inMotionAtBallSnap == TRUE | motionSinceLineset == TRUE, TRUE, FALSE),
+         moved = ifelse(is.na(moved), FALSE, TRUE)) 
+```
+
+## Adding a variable `num_players_moved` indicating how many players moved on the play
+
+```{r}
+num_players_moved <- finished_plays |> 
+  filter(moved == TRUE,
+         frameType == "SNAP") |> 
+  count(gameId, playId) |> 
+  rename(num_players_moved = n)
+
+no_movement <- finished_plays |> 
+  anti_join(num_players_moved) |> 
+  distinct(gameId, playId) |> 
+  mutate(num_players_moved = 0)
+
+num_players_moved <- rbind(num_players_moved, no_movement)
+
+finished_plays <- finished_plays |> 
+  inner_join(num_players_moved)
+```
+
+## Adding variables
+
+
+### Adding distance from line of scrimmage variable 
+```{r}
+finished_plays <- finished_plays |> 
+  mutate(receiver_in_alignment = ifelse(receiver_in_left_alignment == TRUE | receiver_in_right_alignment == TRUE, TRUE, FALSE)) |> 
+  mutate(dist_from_line_of_scrimmage = abs(yardsTillTouchdown - yardlines_to_go))
+```
+
+### Adding receiver alignment number
+```{r}
+finished_plays_more_info <- finished_plays |>  
+  filter(receiver_in_alignment == TRUE,
+         frameType == "SNAP") |> 
+  group_by(gameId, playId) |> 
+  arrange(gameId, playId, y) |> 
+  mutate(left_or_right = ifelse(receiver_in_left_alignment == TRUE, "left", "right"),
+    receiver_number = ifelse(playDirection == "left" & left_or_right == "left", row_number(), NA),
+    receiver_number = ifelse(playDirection == "left" & left_or_right == "right", total_receivers_in_alignment - (row_number() - 1), receiver_number),
+    receiver_number = ifelse(playDirection == "right" & left_or_right == "left", total_receivers_in_alignment - (row_number() - 1), receiver_number),
+    receiver_number = ifelse(playDirection == "right" & left_or_right == "right", row_number(), receiver_number),
+    receiver_number = paste(left_or_right, receiver_number)) |> 
+  ungroup() |> 
+  select(gameId, playId, nflId, receiver_number)
+
+finished_plays_more_info_whole <- inner_join(finished_plays, finished_plays_more_info)
+
+finished_plays_more_info2 <- finished_plays |>
+  filter(receiver_in_alignment == FALSE) |> 
+  mutate(receiver_number = NA)
+
+finished_plays <- rbind(finished_plays_more_info_whole, finished_plays_more_info2)
+  
+```
+
+## Replacing NAs for routeRan
+
+### If run or pass option then if the receiver did not run a route routeRan = NO ROUTE
+
+```{r}
+run_pass_option <- plays |> 
+  select(gameId, playId, pff_runPassOption)
+
+finished_plays <- inner_join(finished_plays, run_pass_option)
+
+
+finished_plays <- finished_plays |> 
+  mutate(routeRan = ifelse(receiver_in_alignment == TRUE & pff_runPassOption == 1 & is.na(routeRan), "NO ROUTE", routeRan)) 
+
+```
+
+### If the play was a hand off or run play and not pff_runPassOption then routeRan = RUN BLOCK
+
+```{r}
+finished_plays <- finished_plays |> 
+  mutate(routeRan = ifelse((event == "handoff" | event == "run") & pff_runPassOption == 0 & is.na(routeRan), "RUN BLOCK", routeRan))
+```
+
+### If it is a pass play and did not run route then NO ROUTE
+```{r}
+finished_plays |> 
+  filter(receiver_in_alignment == TRUE, 
+         frameType == "SNAP",
+         is.na(routeRan)) 
+
+pass_plays <- plays |> 
+  mutate(pass = ifelse(is.na(passResult), FALSE, TRUE)) |> 
+  select(gameId, playId, pass)
+
+
+finished_plays <- inner_join(finished_plays, pass_plays)
+
+finished_plays <- finished_plays |> 
+  mutate(routeRan = ifelse(pass == TRUE & is.na(routeRan), "NO ROUTE", routeRan))
+```
+
+
+## Adding Variables for number of receivers left for each play
+```{r}
+left_players <- finished_plays |>
+  filter(frameType == "SNAP",
+         receiver_in_left_alignment == TRUE) |> 
+  count(gameId, playId) |> 
+  rename(num_receivers_left = n)
+
+
+no_left_players <- finished_plays |> 
+  anti_join(left_players) |> 
+  distinct(gameId, playId) |> 
+  mutate(num_receivers_left = 0)
+
+left_players <- rbind(left_players, no_left_players)
+
+finished_plays <- inner_join(finished_plays, left_players)
+```
+
+## Adding Variables for number of receivers right for each play
+```{r}
+right_players <- finished_plays |>
+  filter(frameType == "SNAP",
+         receiver_in_right_alignment == TRUE) |> 
+  count(gameId, playId) |> 
+  rename(num_receivers_right = n)
+
+
+no_right_players <- finished_plays |> 
+  anti_join(right_players) |> 
+  distinct(gameId, playId) |> 
+  mutate(num_receivers_right = 0)
+
+right_players <- rbind(right_players, no_right_players)
+
+finished_plays <- inner_join(finished_plays, right_players)
+```
+
+
+## Making it so player number is always referring from left to right of alignment
+
+```{r}
+finished_plays |> 
+  mutate(player_number = ifelse(playDirection == "right", 12 - player_number, player_number))
+```
+
+
+# Selecting only plays of players we are predicting
+
+```{r}
+players_predicting <- finished_plays |> 
+  filter(receiver_in_alignment == TRUE,
+         frameType %in% c("BEFORE_SNAP", "SNAP")) 
+
+
+write.csv(players_predicting, "players_predicting.csv")
+```
+
+
