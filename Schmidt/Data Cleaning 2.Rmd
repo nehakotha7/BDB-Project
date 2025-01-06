@@ -529,7 +529,8 @@ players_predicting |>
 
 ```{r}
 players_predicting <- finished_plays |> 
-  filter(receiver_in_alignment == TRUE) 
+  filter(receiver_in_alignment == TRUE,
+         frameType %in% c("BEFORE_SNAP", "SNAP")) 
 
 
 write.csv(players_predicting, "players_predicting.csv")
