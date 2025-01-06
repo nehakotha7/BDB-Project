@@ -1,0 +1,118 @@
+---
+title: "Predicting WR routes based using a logistic model"
+author: "Belle Schmidt"
+date: "2024-12-31"
+output: html_document
+---
+
+# Setting up The Document ------------------------------------------
+
+```{r}
+# loading in the packages necessary
+library(nflverse)
+library(nflreadr)
+library(nflplotR)
+library(ggplot2)
+library(tidyverse)
+library(gganimate)
+library(dplyr)
+library(gganimate)
+library(ggfootball)
+library(readr)
+library(glmnet)
+library(tidymodels)
+library(leaps)
+library(recipes)
+library(parsnip)  # for multinom_reg
+library(workflows)  # for workflow
+library(caret)
+```
+
+```{r}
+# reading in necessary data
+route_plays <- read.csv("players_predicting.csv")
+```
+
+```{r}
+route_plays <- route_plays |> 
+  filter(down == 1, yardsToGo == 10)
+```
+
+
+# Splitting the data for the model ------------------------------
+
+## Splitting to testing and training data
+```{r}
+set.seed(12345)
+route_plays_split <- initial_split(route_plays, prop = 0.8)
+
+route_plays_train <- training(route_plays_split)
+route_plays_test <- testing(route_plays_split)
+```
+
+# Building Model -------------------------------------
+
+```{r}
+# Define the multinomial regression model
+logit_model <- multinom_reg(mode = "classification",
+                            engine = "nnet")
+
+# Create the recipe for preprocessing
+model_recipe <- recipe(routeRan ~ 
+                         nflId + motionSinceLineset + inMotionAtBallSnap + shiftSinceLineset +
+                         quarter + down + yardsToGo + offenseFormation + yardsTillTouchdown +
+                         total_receivers_in_alignment + receiver_in_left_alignment +
+                         receiver_in_right_alignment + score_differential + moved +
+                         num_players_moved + dist_from_line_of_scrimmage + receiver_number, 
+                       data = route_plays) |> 
+  step_dummy(all_nominal(), -all_outcomes())
+
+# Prepare the recipe with the training data
+recipe_prepped <- prep(model_recipe, training = route_plays_train)
+
+# Apply the recipe to the test data
+transformed_route_plays <- bake(recipe_prepped, new_data = route_plays_test)
+
+# Define the workflow
+model_workflow <- workflow() |> 
+  add_recipe(model_recipe) |> 
+  add_model(logit_model)
+
+# Fit the model using the training data
+fit_model <- fit(model_workflow, data = route_plays_train)
+```
+
+# FIX THIS LATE -----------------------------------------------------------
+
+``` {r}
+all_levels <- levels(factor(route_plays$routeRan))
+
+# Make predictions using the trained model
+predictions <- augment(fit_model, new_data = route_plays_test)
+
+# Ensure 'routeRan' and '.pred_class' are factors and have the same levels
+predictions <- predictions |> 
+  mutate(routeRan = factor(routeRan, levels = all_levels), 
+         .pred_class = factor(.pred_class, levels = all_levels))
+
+# Make sure routeRan is a factor -- not working 
+#predictions <- predictions |> 
+#  mutate(routeRan = factor(routeRan), .pred_class = factor(.pred_class))
+
+# Evaluate model accuracy
+accuracy <- predictions |> 
+  yardstick::accuracy(truth = routeRan, estimate = .pred_class)
+```
+
+```{r}
+# not working need to figure out
+# Variable Importance 
+library(vip)
+library(tune)
+library(NeuralNetTools)
+
+model_vip <- extract_fit_parsnip(fit_model) |> 
+  vip()
+```
+
+
