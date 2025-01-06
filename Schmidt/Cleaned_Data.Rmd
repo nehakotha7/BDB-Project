@@ -1,5 +1,5 @@
 ---
-title: "Data Cleaning 2"
+title: "Cleaned Data"
 author: "Belle Schmidt"
 date: "2025-01-02"
 output: html_document
