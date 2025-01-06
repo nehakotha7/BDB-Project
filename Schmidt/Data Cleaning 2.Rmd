@@ -273,12 +273,11 @@ tracking_week9 <- adding_player_x_position(tracking_week9)
 ```{r}
 player_numbers <- function(week_num){
   week_num |> 
-    filter(frameType == "SNAP") |> 
-    group_by(gameId, playId) |> 
-    arrange(gameId, playId, y) |>
+    group_by(gameId, playId, frameId) |> 
+    arrange(gameId, playId, frameId, y) |>
     mutate(player_number = row_number()) |> 
     ungroup() |> 
-    select(gameId, playId, nflId, player_number)
+    select(gameId, playId, nflId, frameId, player_number)
   }
  
 tracking_week1 <- inner_join(tracking_week1, player_numbers(tracking_week1))
@@ -296,10 +295,10 @@ tracking_week9 <- inner_join(tracking_week9, player_numbers(tracking_week9))
 
 receiver_alignment <- function(num_week) {
   num_week |> 
-    mutate(receiver_in_left_alignment = ifelse(player_number %in% c(1, 2, 3) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "left", TRUE, FALSE),
-           receiver_in_left_alignment = ifelse(player_number %in% c(9, 10, 11) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "right", TRUE, receiver_in_left_alignment),
-         receiver_in_right_alignment = ifelse(player_number %in% c(9, 10, 11) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "left", TRUE, FALSE),
-         receiver_in_right_alignment = ifelse(player_number %in% c(1, 2, 3) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "right", TRUE, receiver_in_right_alignment))
+    mutate(receiver_in_left_alignment = ifelse(player_number %in% c(1, 2, 3) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "left" & frameType == "SNAP", TRUE, FALSE),
+           receiver_in_left_alignment = ifelse(player_number %in% c(9, 10, 11) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "right" & frameType == "SNAP", TRUE, receiver_in_left_alignment),
+         receiver_in_right_alignment = ifelse(player_number %in% c(9, 10, 11) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "left" & frameType == "SNAP", TRUE, FALSE),
+         receiver_in_right_alignment = ifelse(player_number %in% c(1, 2, 3) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "right" & frameType == "SNAP", TRUE, receiver_in_right_alignment))
 }
 
 tracking_week1 <- receiver_alignment(tracking_week1)
