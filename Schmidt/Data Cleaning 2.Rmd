@@ -238,15 +238,15 @@ tracking_week9 <- inner_join(tracking_week9, important_variables)
 ```
 
 
-### Creating a variable that indicates how far the players are from the end zone they are trying to score in at the snap (rounded and not) 
+### Creating a variable that indicates how far the players are from the end zone they are trying to score in (rounded and not) 
 ```{r}
 
 adding_player_x_position <- function(week_num){
   week_num |> 
-  mutate(yardlines_to_go = ifelse(playDirection == "left" & frameType == "SNAP", round(x - 10), NA),
-         exact_yards_to_go = ifelse(playDirection == "left" & frameType == "SNAP", x - 10, NA),
-         yardlines_to_go = ifelse(playDirection == "right" & frameType == "SNAP", 100 - round(x - 10), yardlines_to_go), 
-         exact_yards_to_go = ifelse(playDirection == "right" & frameType == "SNAP", 100 - (x - 10), exact_yards_to_go),
+  mutate(yardlines_to_go = ifelse(playDirection == "left", round(x - 10), NA),
+         exact_yards_to_go = ifelse(playDirection == "left", x - 10, NA),
+         yardlines_to_go = ifelse(playDirection == "right", 100 - round(x - 10), yardlines_to_go), 
+         exact_yards_to_go = ifelse(playDirection == "right", 100 - (x - 10), exact_yards_to_go),
          yardlines_to_go = ifelse(frameType == "SNAP" & (yardsTillTouchdown > yardlines_to_go), yardsTillTouchdown, yardlines_to_go))  # all of these were off by less than a yard
 }
 
@@ -401,13 +401,18 @@ finished_plays <- finished_plays |>
   inner_join(num_players_moved)
 ```
 
-## Adding variable 
+## Adding variables
 
+
+### Adding distance from line of scrimmage variable 
 ```{r}
 finished_plays <- finished_plays |> 
   mutate(receiver_in_alignment = ifelse(receiver_in_left_alignment == TRUE | receiver_in_right_alignment == TRUE, TRUE, FALSE)) |> 
   mutate(dist_from_line_of_scrimmage = abs(yardsTillTouchdown - yardlines_to_go))
+```
 
+### Adding receiver alignment number
+```{r}
 finished_plays_more_info <- finished_plays |>  
   filter(receiver_in_alignment == TRUE,
          frameType == "SNAP") |> 
@@ -474,7 +479,7 @@ finished_plays <- finished_plays |>
 ```
 
 
-### Adding Variables for number of receivers left for each play
+## Adding Variables for number of receivers left for each play
 ```{r}
 left_players <- players_predicting |>
   filter(frameType == "SNAP",
@@ -493,7 +498,7 @@ left_players <- rbind(left_players, no_left_players)
 players_predicting <- inner_join(players_predicting, left_players)
 ```
 
-### Adding Variables for number of receivers right for each play
+## Adding Variables for number of receivers right for each play
 ```{r}
 right_players <- players_predicting |>
   filter(frameType == "SNAP",
@@ -512,7 +517,8 @@ right_players <- rbind(right_players, no_right_players)
 players_predicting <- inner_join(players_predicting, right_players)
 ```
 
-### Making it so player number is always referring from left to right of alignment
+
+## Making it so player number is always referring from left to right of alignment
 
 ```{r}
 players_predicting |> 
@@ -520,7 +526,7 @@ players_predicting |>
 ```
 
 
-### Selecting only plays of players we are predicting
+# Selecting only plays of players we are predicting
 
 ```{r}
 players_predicting <- finished_plays |> 
