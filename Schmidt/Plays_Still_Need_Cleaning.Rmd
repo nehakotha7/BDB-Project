@@ -513,3 +513,13 @@ finished_plays <- rbind(finished_plays, finished_one_rb_plays)
 finished_plays |> 
   distinct(gameId, playId)
 ```
+
+### Figuring out how many players are on the left and how many are on the right 
+
+```{r}
+players_predicting |> 
+  filter(frameType == "SNAP") |> 
+  count(gameId, playId, receiver_in_left_alignment) |> 
+  mutate(num_left_receivers = ifelse(receiver_in_left_alignment == TRUE))
+```
+

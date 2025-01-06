@@ -9,6 +9,7 @@ library(readr)
 
 players_predicing <- read.csv("players_predicting.csv")
 
+players_predicing
 
 ```
 
