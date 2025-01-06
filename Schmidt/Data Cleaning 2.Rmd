@@ -295,22 +295,33 @@ tracking_week9 <- inner_join(tracking_week9, player_numbers(tracking_week9))
 
 receiver_alignment <- function(num_week) {
   num_week |> 
-    mutate(receiver_in_left_alignment = ifelse(player_number %in% c(1, 2, 3) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "left" & frameType == "SNAP", TRUE, FALSE),
-           receiver_in_left_alignment = ifelse(player_number %in% c(9, 10, 11) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "right" & frameType == "SNAP", TRUE, receiver_in_left_alignment),
-         receiver_in_right_alignment = ifelse(player_number %in% c(9, 10, 11) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "left" & frameType == "SNAP", TRUE, FALSE),
-         receiver_in_right_alignment = ifelse(player_number %in% c(1, 2, 3) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "right" & frameType == "SNAP", TRUE, receiver_in_right_alignment))
+    filter(frameType == "SNAP") |> 
+    mutate(receiver_in_left_alignment = ifelse(player_number %in% c(1, 2, 3) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "left", TRUE, FALSE),
+           receiver_in_left_alignment = ifelse(player_number %in% c(9, 10, 11) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "right", TRUE, receiver_in_left_alignment),
+         receiver_in_right_alignment = ifelse(player_number %in% c(9, 10, 11) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "left", TRUE, FALSE),
+         receiver_in_right_alignment = ifelse(player_number %in% c(1, 2, 3) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "right", TRUE, receiver_in_right_alignment)) |> 
+    select(gameId, playId, nflId, receiver_in_left_alignment, receiver_in_right_alignment)
 }
 
-tracking_week1 <- receiver_alignment(tracking_week1)
-tracking_week2 <- receiver_alignment(tracking_week2)
-tracking_week3 <- receiver_alignment(tracking_week3)
-tracking_week4 <- receiver_alignment(tracking_week4)
-tracking_week5 <- receiver_alignment(tracking_week5)
-tracking_week6 <- receiver_alignment(tracking_week6)
-tracking_week7 <- receiver_alignment(tracking_week7)
-tracking_week8 <- receiver_alignment(tracking_week8)
-tracking_week9 <- receiver_alignment(tracking_week9)
+receiver_alignment_week1 <- receiver_alignment(tracking_week1)
+receiver_alignment_week2 <- receiver_alignment(tracking_week2)
+receiver_alignment_week3 <- receiver_alignment(tracking_week3)
+receiver_alignment_week4 <- receiver_alignment(tracking_week4)
+receiver_alignment_week5 <- receiver_alignment(tracking_week5)
+receiver_alignment_week6 <- receiver_alignment(tracking_week6)
+receiver_alignment_week7 <- receiver_alignment(tracking_week7)
+receiver_alignment_week8 <- receiver_alignment(tracking_week8)
+receiver_alignment_week9 <- receiver_alignment(tracking_week9)
 
+tracking_week1 <- inner_join(tracking_week1, receiver_alignment_week1)
+tracking_week2 <- inner_join(tracking_week2, receiver_alignment_week2)
+tracking_week3 <- inner_join(tracking_week3, receiver_alignment_week3)
+tracking_week4 <- inner_join(tracking_week4, receiver_alignment_week4)
+tracking_week5 <- inner_join(tracking_week5, receiver_alignment_week5)
+tracking_week6 <- inner_join(tracking_week6, receiver_alignment_week6)
+tracking_week7 <- inner_join(tracking_week7, receiver_alignment_week7)
+tracking_week8 <- inner_join(tracking_week8, receiver_alignment_week8)
+tracking_week9 <- inner_join(tracking_week9, receiver_alignment_week9)
 ```
 
 ```{r}
@@ -480,48 +491,49 @@ finished_plays <- finished_plays |>
 
 ## Adding Variables for number of receivers left for each play
 ```{r}
-left_players <- players_predicting |>
+left_players <- finished_plays |>
   filter(frameType == "SNAP",
          receiver_in_left_alignment == TRUE) |> 
   count(gameId, playId) |> 
   rename(num_receivers_left = n)
 
 
-no_left_players <- players_predicting |> 
+no_left_players <- finished_plays |> 
   anti_join(left_players) |> 
   distinct(gameId, playId) |> 
   mutate(num_receivers_left = 0)
 
 left_players <- rbind(left_players, no_left_players)
 
-players_predicting <- inner_join(players_predicting, left_players)
+finished_plays <- inner_join(finished_plays, left_players)
 ```
 
 ## Adding Variables for number of receivers right for each play
 ```{r}
-right_players <- players_predicting |>
+right_players <- finished_plays |>
   filter(frameType == "SNAP",
          receiver_in_right_alignment == TRUE) |> 
   count(gameId, playId) |> 
   rename(num_receivers_right = n)
 
 
-no_right_players <- players_predicting |> 
+no_right_players <- finished_plays |> 
   anti_join(right_players) |> 
   distinct(gameId, playId) |> 
   mutate(num_receivers_right = 0)
 
 right_players <- rbind(right_players, no_right_players)
 
-players_predicting <- inner_join(players_predicting, right_players)
+finished_plays <- inner_join(finished_plays, right_players)
 ```
 
 
 ## Making it so player number is always referring from left to right of alignment
 
 ```{r}
-players_predicting |> 
+finished_plays <- finished_plays |> 
   mutate(player_number = ifelse(playDirection == "right", 12 - player_number, player_number))
+
 ```
 
 
@@ -530,7 +542,9 @@ players_predicting |>
 ```{r}
 players_predicting <- finished_plays |> 
   filter(receiver_in_alignment == TRUE,
-         frameType %in% c("BEFORE_SNAP", "SNAP")) 
+         frameType %in% c("BEFORE_SNAP", "SNAP"))
+
+players_predicting
 
 
 write.csv(players_predicting, "players_predicting.csv")

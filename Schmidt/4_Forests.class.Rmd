@@ -1,0 +1,311 @@
+---
+title: "Random Forests"
+author: "Jaime Davila"
+date: "12/3/2024"
+output:
+  pdf_document: default
+  html_document: default
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE, message=FALSE)
+library(tidyverse)
+library(tidymodels)
+library(dslabs)
+tidymodels_prefer(quiet=TRUE)
+```
+
+
+# Introduction
+
+Today we will be using a small subset of the MNIST dataset, by selecting 2000 digits for both training and testing:
+
+
+```{r}
+set.seed(1234)
+mnist_tbl <- read_csv("~/Mscs_341_F24/Class/Data/mnist.csv.gz") |>
+  mutate(digit = as.factor(digit))|>
+  slice_sample(n=2000)
+
+mnist_split <- initial_split(mnist_tbl)
+digit_train_tbl <- training(mnist_split)
+digit_test_tbl <- testing(mnist_split)
+```
+
+
+And as before let's make a couple of functions to plot particular digits from our dataset
+
+```{r}
+plotImage <- function(dat,size=28){
+  imag <- matrix(dat,nrow=size)[,28:1]
+  image(imag,col=grey.colors(256), xlab = "", ylab="") 
+}
+
+plot_row <- function(tbl) {
+  ntbl <- tbl |>
+    select(V1:V784)
+  plotImage(as.matrix(ntbl))
+}
+```
+
+```{r}
+# Plot the 100th digit from training
+plot_row(digit_train_tbl[100,])
+# Plot the 12th digit from testing
+plot_row(digit_test_tbl[12,])
+```
+
+In today's class we are interested in the problem of multi-digit classification: given an image we would like to determine what digit it corresponds to. 
+
+# Maximal classification trees
+
+1. a. Fill out the details of the function `create_rtree` which creates a maximal tree for doing multi-digit classification. The function receives a training dataset and returns a fitted regression tree. Create a regression tree called `digit_rtree_model` using the function `create_rtree` on  your training dataset.
+
+```{r}
+create_rtree <- function (train_tbl) {
+  
+}
+```
+
+```{r}
+create_rtree <- function (train_tbl) {
+  digit_model <-
+    decision_tree(cost_complexity = 0) |>
+    set_mode("classification") |>
+    set_engine("rpart")
+
+  digit_recipe <- recipe(digit ~ ., data=train_tbl)
+
+  digit_wflow <- workflow() |>
+      add_recipe(digit_recipe) |>
+      add_model(digit_model) 
+
+   fit(digit_wflow, train_tbl)
+}
+
+digit_rtree_model <- create_rtree(digit_train_tbl)
+```
+
+b. Calculate the accuracy and confusion matrix of `digit_rtree_model` using your testing dataset
+
+```{r}
+augment(digit_rtree_model,digit_test_tbl) |>
+  accuracy(truth=digit, estimate=.pred_class)
+
+augment(digit_rtree_model,digit_test_tbl) |>
+  conf_mat(truth=digit, estimate=.pred_class)
+```
+
+I got curious about why some 4's get classified as 9's so I decided to take a look:
+
+```{r}
+miss_4s_tbl <- augment(digit_rtree_model,digit_test_tbl) |> 
+  filter(digit==4 & .pred_class==9)
+
+
+plot_row(miss_4s_tbl[1,])
+plot_row(miss_4s_tbl[2,])
+plot_row(miss_4s_tbl[3,])
+```
+
+On a different note, we can define a function that will allow us to plot the pixel importance for a particular model.
+
+```{r echo=TRUE}
+create_image_vip <- function(model_fit) {
+  # Creates the importance image
+  imp_tbl <- model_fit |>
+    extract_fit_engine() |>
+    vip::vi() |>
+    mutate(col=as.double(str_remove(Variable,"V")))
+  mat <- rep(0, 28*28)
+  mat[imp_tbl$col] <- imp_tbl$Importance
+  mat
+}
+```
+
+Let's use this function to show the important pixels for our model:
+
+```{r echo=TRUE, fig.show='asis'}
+create_image_vip(digit_rtree_model) |>
+  plotImage()
+```
+
+
+# Using bootstrapping
+
+Bootstrapping allows us to create new training datasets by sampling with replacement from our training dataset. Let's create 3 bootstrap samples from our original training dataset:
+
+```{r echo=TRUE, fig.show="asis"}
+set.seed(12345)
+bootstrap_split <- bootstraps(digit_train_tbl, times=3)
+bootstrap_split
+```
+
+Notice how `bootstrap_split` is a tibble. Also note that we can access the 2nd bootstrap by using the command:
+
+```{r echo=TRUE, results=TRUE}
+analysis(get_rsplit(bootstrap_split,2))
+```
+
+2. Fit classification trees to each bootstrapped training dataset and plot the variable importance as an image for each model. Are there pixels that are common across the three models?
+
+```{r results=FALSE}
+for (i in 1:3) {
+  bootstrap_split |>
+  get_rsplit(i) |>
+  analysis() |>
+  create_rtree() |>
+  create_image_vip() |>
+  plotImage() |>
+  print()
+}
+```
+
+Let's take a look at this using 10 bootstraps
+
+```{r echo=TRUE, fig.show='hide', results=FALSE}
+bootstrap_split <- bootstraps(digit_train_tbl, times=20)
+for (i in 1:5) {
+  bootstrap_split |>
+  get_rsplit(i) |>
+  analysis() |>
+  create_rtree() |>
+  create_image_vip() |>
+  plotImage() |>
+  print()
+}
+```
+
+
+# Remembering bagging
+
+In bagging we combine a fixed amount of trees which are trained on bootstraps of our training dataset. Let's create a bagging model by leveraging the function `use_ranger` which generates code that we can copy/paste to create our model.
+
+```{r}
+library(usemodels)
+use_ranger(digit~., data=digit_train_tbl, tune=FALSE)
+```
+
+We will modify the generated code by adding:
+
+* We will be using `trees=100` so that our code runs faster
+* We will be using `mtry=784` so that make sure that we are using all of our variables for each of our classification trees.
+* We will add the parameter `importance="impurity"`, so that we can determine the importance of the variables in our model. 
+
+```{r}
+ranger_recipe <- 
+  recipe(formula = digit ~ ., data = digit_train_tbl) 
+
+ranger_spec <- 
+  rand_forest(trees = 100, mtry=784) |> 
+  set_mode("classification") |> 
+  set_engine("ranger",importance = "impurity")  
+
+ranger_workflow <- 
+  workflow() |> 
+  add_recipe(ranger_recipe) |> 
+  add_model(ranger_spec) 
+```
+
+Finally let's fit our model on the training dataset and calculate our accuracy on the testing dataset. Notice how our bagging model improves significantly over individual maximal classification trees
+
+```{r}
+digit_bag_model <- fit(ranger_workflow, digit_train_tbl)
+
+augment(digit_bag_model, digit_test_tbl) |>
+  accuracy(truth=digit, estimate= .pred_class)
+
+augment(digit_bag_model, digit_test_tbl) |>
+  conf_mat(truth=digit, estimate= .pred_class)
+```
+
+And let's look at the 4's that get classified as 9's in this model
+
+```{r}
+miss_4s_tbl <- augment(digit_bag_model,digit_test_tbl) |> 
+  filter(digit==4 & .pred_class==9)
+
+for (i in 1:nrow(miss_4s_tbl)) {
+  print(plot_row(miss_4s_tbl[i,]))
+  Sys.sleep(1)
+}
+```
+
+Notice that the variable importance in a bag can be calculated by calculating the variable importance across each tree and then summing them up across all trees. We can plot our variable importance for maximal trees and for our bagging model below. Notice how in bagging more pixels end up being used, however some pixels in the middle of the image are used repetitively
+
+```{r}
+create_image_vip(digit_rtree_model) |>
+  plotImage()
+
+create_image_vip(digit_bag_model) |>
+  plotImage()
+```
+
+# Forests
+
+Let's remember that the standard deviation of  $\frac{(X_1 + \dots + X_n)}{n}$ is $\frac {\sigma} {\sqrt n}$ if $X_1, \dots, X_n$ are *independent*. In practice the outcome of a maximal tree can be quite correlated with the outcome of a different maximal tree since some variables are dominant when we do splits over our training data (think for examples the pixels in the center of our digit images)
+
+In *random forests* we try to decorrelate each of these trees by selecting a random fraction of the variables at each level of the tree, to force different trees to not be related to each other. In practice the number of variables can be selected by using the parameter `mtry` and usually is:
+
+* $\frac{n}{3}$ for regression trees
+* $\sqrt{n}$ for classification trees.
+
+This can be implemented using the following code
+
+```{r}
+ranger_recipe <- 
+  recipe(formula = digit ~ ., data = digit_train_tbl) 
+
+ranger_spec <- 
+  rand_forest(trees = 100, mtry=28) |> 
+  set_mode("classification") |> 
+  set_engine("ranger",importance = "impurity")  
+
+ranger_workflow <- 
+  workflow() |> 
+  add_recipe(ranger_recipe) |> 
+  add_model(ranger_spec) 
+
+digit_forest_model <- fit(ranger_workflow, digit_train_tbl)
+```
+
+Notice that we can calculate as before our accuracy and confusion matrix and we get an improvement over our bagging approach:
+
+```{r}
+augment(digit_forest_model, digit_test_tbl) |>
+  accuracy(truth=digit, estimate= .pred_class)
+
+augment(digit_forest_model, digit_test_tbl) |>
+  conf_mat(truth=digit, estimate= .pred_class)
+```
+
+And let's check the 4's that get classified as 9's in this last model
+
+```{r}
+miss_4s_tbl <- augment(digit_forest_model,digit_test_tbl) |> 
+  filter(digit==4 & .pred_class==9)
+
+for (i in 1:nrow(miss_4s_tbl)) {
+  print(plot_row(miss_4s_tbl[i,]))
+  Sys.sleep(1)
+}
+```
+ 
+
+Finally, let's plot our variable importance for our three methods:
+
+```{r fig.show="asis", echo=TRUE}
+create_image_vip(digit_rtree_model) |>
+  plotImage()
+
+create_image_vip(digit_bag_model) |>
+  plotImage()
+
+create_image_vip(digit_forest_model) |>
+  plotImage()
+```
+
+Notice that when compared to our bagging model, our random forest starts using more pixels in our image.
+
