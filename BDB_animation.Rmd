@@ -1,0 +1,144 @@
+---
+title: "BDB_animation"
+author: "Neha Kotha"
+date: "2025-01-06"
+output: html_document
+---
+
+```{r}
+library(nflverse)
+library(nflreadr)
+library(nflplotR)
+library(ggplot2)
+library(tidyverse)
+library(gganimate)
+library(dplyr)
+library(gganimate)
+library(ggfootball)
+library(ranger)
+library(caret) 
+```
+
+```{r}
+games <- read.csv("games.csv")
+player_play <- read.csv("player_play.csv")
+players <- read.csv("players.csv")
+plays <- read.csv("plays.csv")
+```
+
+```{r}
+tracking_week1 <- read.csv("tracking_week_1.csv")
+tracking_week2 <- read.csv("tracking_week_2.csv")
+tracking_week3 <- read.csv("tracking_week_3.csv")
+tracking_week4 <- read.csv("tracking_week_4.csv")
+tracking_week5 <- read.csv("tracking_week_5.csv")
+tracking_week6 <- read.csv("tracking_week_6.csv")
+tracking_week7 <- read.csv("tracking_week_7.csv")
+tracking_week8 <- read.csv("tracking_week_8.csv")
+tracking_week9 <- read.csv("tracking_week_9.csv")
+```
+
+# PLAY ANIMATION 
+# filter data for one singular play: find nflId's of all players on the field and the ball data for play animation
+```{r}
+# animation of MIA v CIN week 1, Q1 ----------------------------------
+KC_AZ_play <- tracking_week1 |> 
+  filter(
+    gameId == 2022091110,
+    club %in% c("KC", "ARI"),
+    playId == 1868
+  ) |> 
+  arrange(desc(s))
+
+# all players on the field nflId's during pass play
+players_on_field <- KC_AZ_play |> 
+  select(nflId, club, jerseyNumber) |> 
+  distinct()
+
+nfl_Ids <- players_on_field |> 
+  pull(nflId)   
+
+nfl_Ids
+
+# filter tracking data to include specific players for this play and time range
+KC_AZ_play <- tracking_week1 |> 
+  filter(
+    gameId == 2022091110,  
+    playId == 1868, 
+    nflId %in% nfl_Ids 
+  )
+
+
+KC_AZ_play <- KC_AZ_play|> 
+  left_join(plays |> select(gameId, playId, absoluteYardlineNumber), 
+            by = c("gameId", "playId"))
+# filter for ball data
+ball_data <- tracking_week1 |> 
+  filter(
+    gameId == 2022091110,  
+    playId == 1868, 
+    is.na(nflId)  # row with NA nflId corresponds to the ball
+  )
+
+range(KC_AZ_play$x)
+range(KC_AZ_play$y)
+```
+
+# animation of all players movement during the run play (KC vs. ARI, week 1)
+```{r}
+# Merge the tracking data with KC_ARI_play to include receiver_number
+KC_AZ_play <- KC_AZ_play |> 
+  left_join(KC_ARI_play |> 
+              select(nflId, receiver_number), by = "nflId")
+```
+
+```{r}
+# Define team colors
+team_colors <- c("KC" = "white", "ARI" = "red")
+
+# Animation of only the 5 receivers from KC
+animation_kc_receivers <- ggfootball(left_endzone = "white", right_endzone = "red", field_alpha = 0.8) +
+  
+  # Plot all players positions over time as points
+  geom_point(data = KC_AZ_play, 
+             aes(x = x, y = y, fill = club), size = 2, shape = 21, color = "black", stroke = 0.5, show.legend = FALSE) + 
+  
+  # Add labels for jersey numbers only for the KC receivers
+  geom_text(data = filter(KC_AZ_play, !is.na(receiver_number)), 
+            aes(x = x, y = y, label = receiver_number),
+            color = "white", size = 2, vjust = -1, show.legend = FALSE) +
+  
+  # Add the ball
+  geom_point(data = ball_data, 
+             aes(x = x, y = y), size = 1, shape = 23, fill = "brown", color = "black", stroke = 0.5, show.legend = FALSE) +
+
+  # Set theme and limits for the plot
+  coord_fixed(xlim = c(15, 60), ylim = c(4, 54)) + 
+  scale_color_manual(values = c("red", "white")) +  # Map team colors for the borders
+  scale_fill_manual(values = c("red", "white")) +   # Map team colors for the fill
+  labs(title = "KC vs. ARI Pass Play",
+       subtitle = "Frame: {frame_time}") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0),
+    plot.subtitle = element_text(hjust = 0),
+    axis.title = element_blank(),   
+    axis.text = element_blank(),    
+    axis.ticks = element_blank()
+  )
+
+# Create the animation with transition by frameId
+animation_kc_receivers <- animation_kc_receivers + 
+  transition_time(frameId) +  # Animate based on frameId
+  ease_aes('linear') 
+
+# Display the animation with proper frames per second
+total_frames <- length(unique(KC_AZ_play$frameId))
+animate(animation_kc_receivers, nframes = total_frames, fps = 25, duration = total_frames / 10,
+        width = 800, height = 500, res = 150)
+```
+
+```{r}
+# Save the animation as a gif file
+anim_save("kc_ari_play_animation.gif", animation = animation_kc_receivers)
+```
