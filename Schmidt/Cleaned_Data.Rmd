@@ -195,13 +195,21 @@ official_position <- players |>
   rename(official_position = position)
 
 tracking_week1 <- inner_join(tracking_week1, official_position)
+
 tracking_week2 <- inner_join(tracking_week2, official_position)
+
 tracking_week3 <- inner_join(tracking_week3, official_position)
+
 tracking_week4 <- inner_join(tracking_week4, official_position)
+
 tracking_week5 <- inner_join(tracking_week5, official_position)
+
 tracking_week6 <- inner_join(tracking_week6, official_position)
+
 tracking_week7 <- inner_join(tracking_week7, official_position)
+
 tracking_week8 <- inner_join(tracking_week8, official_position)
+
 tracking_week9 <- inner_join(tracking_week9, official_position)
 ```
 
@@ -269,60 +277,85 @@ tracking_week8 <- adding_player_x_position(tracking_week8)
 tracking_week9 <- adding_player_x_position(tracking_week9)
 ```
 
-### Indicating which player number they are (1 means furthest left and 11 means furthest right - on tracking data scale)
+### Indicating which player number they are (1 means furthest left and 11 means furthest right - in terms of direction they are facing)
 ```{r}
 player_numbers <- function(week_num){
   week_num |> 
     group_by(gameId, playId, frameId) |> 
     arrange(gameId, playId, frameId, y) |>
-    mutate(player_number = row_number()) |> 
+    mutate(player_number = ifelse(playDirection == "right", 12 - row_number(), row_number())) |> 
     ungroup() |> 
     select(gameId, playId, nflId, frameId, player_number)
   }
  
 tracking_week1 <- inner_join(tracking_week1, player_numbers(tracking_week1))
+
 tracking_week2 <- inner_join(tracking_week2, player_numbers(tracking_week2))
+
 tracking_week3 <- inner_join(tracking_week3, player_numbers(tracking_week3))
+
 tracking_week4 <- inner_join(tracking_week4, player_numbers(tracking_week4))
+
 tracking_week5 <- inner_join(tracking_week5, player_numbers(tracking_week5))
+
 tracking_week6 <- inner_join(tracking_week6, player_numbers(tracking_week6))
+
 tracking_week7 <- inner_join(tracking_week7, player_numbers(tracking_week7))
+
 tracking_week8 <- inner_join(tracking_week8, player_numbers(tracking_week8))
+
 tracking_week9 <- inner_join(tracking_week9, player_numbers(tracking_week9))
 ```
 
+# IMPORTANT NOTE: This is assuming that the running back in the backfield is NOT included in the receiver alignment
 ```{r}
-
 receiver_alignment <- function(num_week) {
   num_week |> 
     filter(frameType == "SNAP") |> 
-    mutate(receiver_in_left_alignment = ifelse(player_number %in% c(1, 2, 3) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "left", TRUE, FALSE),
-           receiver_in_left_alignment = ifelse(player_number %in% c(9, 10, 11) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "right", TRUE, receiver_in_left_alignment),
-         receiver_in_right_alignment = ifelse(player_number %in% c(9, 10, 11) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "left", TRUE, FALSE),
-         receiver_in_right_alignment = ifelse(player_number %in% c(1, 2, 3) & (!is.na(routeRan) | official_position %in% c("TE", "WR")) & playDirection == "right", TRUE, receiver_in_right_alignment)) |> 
+    mutate(receiver_in_left_alignment = ifelse(player_number %in% c(1, 2, 3) & (!is.na(routeRan) | official_position %in% c("TE", "WR")), TRUE, FALSE),
+         receiver_in_right_alignment = ifelse(player_number %in% c(9, 10, 11) & (!is.na(routeRan) | official_position %in% c("TE", "WR")), TRUE, FALSE)) |> 
     select(gameId, playId, nflId, receiver_in_left_alignment, receiver_in_right_alignment)
 }
 
 receiver_alignment_week1 <- receiver_alignment(tracking_week1)
+
 receiver_alignment_week2 <- receiver_alignment(tracking_week2)
+
 receiver_alignment_week3 <- receiver_alignment(tracking_week3)
+
 receiver_alignment_week4 <- receiver_alignment(tracking_week4)
+
 receiver_alignment_week5 <- receiver_alignment(tracking_week5)
+
 receiver_alignment_week6 <- receiver_alignment(tracking_week6)
+
 receiver_alignment_week7 <- receiver_alignment(tracking_week7)
+
 receiver_alignment_week8 <- receiver_alignment(tracking_week8)
+
 receiver_alignment_week9 <- receiver_alignment(tracking_week9)
 
+
 tracking_week1 <- inner_join(tracking_week1, receiver_alignment_week1)
+
 tracking_week2 <- inner_join(tracking_week2, receiver_alignment_week2)
+
 tracking_week3 <- inner_join(tracking_week3, receiver_alignment_week3)
+
 tracking_week4 <- inner_join(tracking_week4, receiver_alignment_week4)
+
 tracking_week5 <- inner_join(tracking_week5, receiver_alignment_week5)
+
 tracking_week6 <- inner_join(tracking_week6, receiver_alignment_week6)
+
 tracking_week7 <- inner_join(tracking_week7, receiver_alignment_week7)
+
 tracking_week8 <- inner_join(tracking_week8, receiver_alignment_week8)
+
 tracking_week9 <- inner_join(tracking_week9, receiver_alignment_week9)
 ```
+
+# Identifying which plays have the correct receivers in alignment --------------------
 
 ```{r}
 finished_plays_playdID <- function(receiver_alignment_num_week) {
@@ -336,13 +369,21 @@ finished_plays_playdID <- function(receiver_alignment_num_week) {
 
 
 finished_plays_week1 <- inner_join(tracking_week1, finished_plays_playdID(tracking_week1))
+
 finished_plays_week2 <- inner_join(tracking_week2, finished_plays_playdID(tracking_week2)) 
+
 finished_plays_week3 <- inner_join(tracking_week3, finished_plays_playdID(tracking_week3))
+
 finished_plays_week4 <- inner_join(tracking_week4, finished_plays_playdID(tracking_week4))
+
 finished_plays_week5 <- inner_join(tracking_week5, finished_plays_playdID(tracking_week5))
+
 finished_plays_week6 <- inner_join(tracking_week6, finished_plays_playdID(tracking_week6))
+
 finished_plays_week7 <- inner_join(tracking_week7, finished_plays_playdID(tracking_week7))
+
 finished_plays_week8 <- inner_join(tracking_week8, finished_plays_playdID(tracking_week8))
+
 finished_plays_week9 <- inner_join(tracking_week9, finished_plays_playdID(tracking_week9))
 ```
 
@@ -354,19 +395,126 @@ finished_plays <- rbind(finished_plays_week1, finished_plays_week2, finished_pla
 finished_plays |> 
   distinct(gameId, playId)
 
-messed_left_up <- finished_plays |> 
+messed_up <- finished_plays |> 
   filter(receiver_in_left_alignment == "TRUE",
          frameType == "SNAP") |> 
   count(gameId, playId, num_receivers_one_side, num_receivers_other_side) |> 
   filter(n != num_receivers_other_side & n != num_receivers_one_side) |> 
   select(gameId, playId)
 
-finished_plays <- anti_join(finished_plays, messed_left_up) 
+finished_plays <- anti_join(finished_plays, messed_up) 
   
-# 10,956 plays left 
+# 10,956 plays completely finished 
 finished_plays |> 
   distinct(gameId, playId)
-  
+```
+
+# Identifying plays with too many receivers in alignment -------------------------
+
+```{r}
+too_many_receivers_playdID <- function(receiver_alignment_num_week) {
+  receiver_alignment_num_week |> 
+    filter(frameType == "SNAP",
+           receiver_in_left_alignment == TRUE | receiver_in_right_alignment == TRUE) |> 
+    count(gameId, playId, total_receivers_in_alignment) |> 
+    filter(n > total_receivers_in_alignment) |> 
+    select(gameId, playId)
+}
+
+
+too_many_receivers_week1 <- inner_join(tracking_week1, too_many_receivers_playdID(tracking_week1))
+
+too_many_receivers_week2 <- inner_join(tracking_week2, too_many_receivers_playdID(tracking_week2)) 
+
+too_many_receivers_week3 <- inner_join(tracking_week3, too_many_receivers_playdID(tracking_week3))
+
+too_many_receivers_week4 <- inner_join(tracking_week4, too_many_receivers_playdID(tracking_week4))
+
+too_many_receivers_week5 <- inner_join(tracking_week5, too_many_receivers_playdID(tracking_week5))
+
+too_many_receivers_week6 <- inner_join(tracking_week6, too_many_receivers_playdID(tracking_week6))
+
+too_many_receivers_week7 <- inner_join(tracking_week7, too_many_receivers_playdID(tracking_week7))
+
+too_many_receivers_week8 <- inner_join(tracking_week8, too_many_receivers_playdID(tracking_week8))
+
+too_many_receivers_week9 <- inner_join(tracking_week9, too_many_receivers_playdID(tracking_week9))
+```
+
+```{r}
+too_many_receiver_plays <- rbind(too_many_receivers_week1, too_many_receivers_week2, too_many_receivers_week3, too_many_receivers_week4, too_many_receivers_week5, too_many_receivers_week6, too_many_receivers_week7, too_many_receivers_week8, too_many_receivers_week9)
+
+# there are 2,231 distinct plays
+too_many_receiver_plays |> 
+  distinct(gameId, playId)
+
+too_many_receiver_plays |> 
+  filter(frameType == "SNAP",
+         receiver_in_left_alignment == TRUE | receiver_in_right_alignment == TRUE,
+         !is.na(routeRan)) |> 
+  count(gameId, playId, total_receivers_in_alignment) |> # The number of receivers in alignment that ran a route 
+  filter(n == total_receivers_in_alignment)
+```
+
+## Identifying which side is messed up 
+
+```{r}
+messed_up_left <- too_many_receiver_plays |> 
+  filter(receiver_in_left_alignment == "TRUE",
+         frameType == "SNAP") |> 
+  count(gameId, playId, num_receivers_one_side, num_receivers_other_side) |> 
+  filter(n != num_receivers_other_side & n != num_receivers_one_side) |> 
+  select(gameId, playId)
+
+# 1,032 on the left
+messed_up_left
+
+messed_up_right_plays <- anti_join(too_many_receiver_plays, messed_left_up) 
+
+messed_up_left_plays <- inner_join(too_many_receiver_plays, messed_left_up) 
+```
+
+
+# Identifying plays with not enough receivers in alignment -------------------------
+
+```{r}
+not_enough_receivers_playdID <- function(receiver_alignment_num_week) {
+  receiver_alignment_num_week |> 
+    filter(frameType == "SNAP",
+           receiver_in_left_alignment == TRUE | receiver_in_right_alignment == TRUE) |> 
+    count(gameId, playId, total_receivers_in_alignment) |> 
+    filter(n < total_receivers_in_alignment) |> 
+    select(gameId, playId)
+}
+
+
+not_enough_receivers_week1 <- inner_join(tracking_week1, not_enough_receivers_playdID(tracking_week1))
+
+not_enough_receivers_week2 <- inner_join(tracking_week2, not_enough_receivers_playdID(tracking_week2)) 
+
+not_enough_receivers_week3 <- inner_join(tracking_week3, not_enough_receivers_playdID(tracking_week3))
+
+not_enough_receivers_week4 <- inner_join(tracking_week4, not_enough_receivers_playdID(tracking_week4))
+
+not_enough_receivers_week5 <- inner_join(tracking_week5, not_enough_receivers_playdID(tracking_week5))
+
+not_enough_receivers_week6 <- inner_join(tracking_week6, not_enough_receivers_playdID(tracking_week6))
+
+not_enough_receivers_week7 <- inner_join(tracking_week7, not_enough_receivers_playdID(tracking_week7))
+
+not_enough_receivers_week8 <- inner_join(tracking_week8, not_enough_receivers_playdID(tracking_week8))
+
+not_enough_receivers_week9 <- inner_join(tracking_week9, not_enough_receivers_playdID(tracking_week9))
+```
+
+```{r}
+not_enough_receiver_plays <- rbind(not_enough_receivers_week1, not_enough_receivers_week2, not_enough_receivers_week3, not_enough_receivers_week4, not_enough_receivers_week5, not_enough_receivers_week6, not_enough_receivers_week7, not_enough_receivers_week8, not_enough_receivers_week9)
+
+# there are 1,271 distinct plays
+not_enough_receiver_plays |> 
+  distinct(gameId, playId)
+
+# Note there is currently a total of 3,690 incorrect and 10,956 plays correct; total 14,646 plays
 ```
 
 # Adding Variables ------------------------
@@ -527,14 +675,6 @@ right_players <- rbind(right_players, no_right_players)
 finished_plays <- inner_join(finished_plays, right_players)
 ```
 
-
-## Making it so player number is always referring from left to right of alignment
-
-```{r}
-finished_plays <- finished_plays |> 
-  mutate(player_number = ifelse(playDirection == "right", 12 - player_number, player_number))
-
-```
 
 
 # Selecting only plays of players we are predicting

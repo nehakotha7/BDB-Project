@@ -1,9 +1,11 @@
 ---
-title: "Adding Variables To Data"
+title: "Adding Variables To Data Attempt 1"
 author: "Belle Schmidt"
 date: "2024-12-31"
 output: html_document
 ---
+
+**NOTE: I did not end up using any of this code in my final document. This was used in the previous version of the data. I recognize that the motion and distance data variables are not correct. I would, however, like to add distance moved in the new dataset in the future. My problem with this was just that not all plays have a line set moment, meaning that I have to find a good, consistent starting variable for all plays.** 
 
 ```{r}
 # reading in the packages necessary
