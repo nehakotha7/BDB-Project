@@ -138,6 +138,8 @@ prop_formation |>
 
 **Empty:** When there are no backs in the backfield so the quarterback is the only player in the backfield
 
+**I-Formation**: When the quarterback is under center. The fullback is directly behind him and the running back is behind him. It is typically a run play but can also be used for big gains because the wide receivers can get behind the defense faster. 
+
 **Pistol:** When the quarterback is a couple yards behind the center (closer than for shotgun though) and there is a running back right behind him
 
 **Wildcat:** when the ball is snapped to a position player other than the QB... might want to remove these
