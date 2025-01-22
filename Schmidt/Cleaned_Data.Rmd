@@ -160,7 +160,6 @@ tracking_week7 <- inner_join(tracking_week7, non_sneaks)
 tracking_week8 <- inner_join(tracking_week8, non_sneaks)
 
 tracking_week9 <- inner_join(tracking_week9, non_sneaks)
-
 ```
 
 # Dealing with play where two frames have "line_set" moment  ------------------------
@@ -185,7 +184,7 @@ tracking_week1 <- tracking_week1 |>
   mutate(event = ifelse(gameId == 2022091103 & playId == 4434 & frameId == 4, "second_line_set", event))
 ```
 
-# Identifying which players are included in the receiver alignment  -----------------------------------
+# Identifying which players are included in the receiver alignment  --------------------
 
 ## Setting up the data to determine which players are included in the receiver alignment 
 
@@ -309,6 +308,8 @@ tracking_week9 <- inner_join(tracking_week9, player_numbers(tracking_week9))
 ```
 
 # IMPORTANT NOTE: This is assuming that the running back in the backfield is NOT included in the receiver alignment
+
+### Initially trying to determine if player is in left or right alignment
 ```{r}
 receiver_alignment <- function(num_week) {
   num_week |> 
@@ -582,7 +583,7 @@ messed_up_side_unsure |>
 
 ```
 
-## Identifying which players are not actually receivers in alignment -------------------
+## Identifying which players are not actually receivers in alignment ----------------
 
 ### Plays with only one receiver in alignment 
 ```{r}
@@ -599,31 +600,45 @@ fixed_one_receiver_play <- messed_up_left |>
 ### Plays with two receivers in alignment; one on each side
 ```{r}
 
-fixing_receivers <- function(data, t, l, r, num) {
+fixing_receivers <- function(data, t, l, r) {
   data |> 
   filter(total_receivers_in_alignment == t, num_receivers_one_side == l,
          num_receivers_other_side == r,
-         frameType == "SNAP",
-         player_number == num,
-         official_position %in% c("WR", "TE")) |> 
-    distinct(gameId, playId, displayName) |> 
-    mutate(receiver_in_left_alignment_new = TRUE)
+         frameType == "SNAP")
 }
 
-# All 27 plays with 1 receiver on each side had WR or TE in the 1 position
-left_receivers <- fixing_receivers(messed_up_left, 2, 1, 1, 1) 
+# there are 27 plays with 1 receiver on each side
+total_2_left_1_right_1 <- fixing_receivers(messed_up_left, 2, 1, 1) |> 
+    distinct(gameId, playId)
 
-  
-## NEED TO FIX THIS PART!!! 
-total_two_left_one_plays_fixed <- messed_up_left |> 
-  full_join(left_receivers) |> 
+# 23 of them have WR in the 1 position
+total_2_left_1_right_1_position1 <- fixing_receivers(messed_up_left, 2, 1, 1) |> 
+  filter(player_number == 1,
+         official_position %in% c("WR")) |> 
+    distinct(gameId, playId) 
+
+# these are the left receivers in those plays
+fix_one_receiver_left_part1 <- fixing_receivers(messed_up_left, 2, 1, 1) |> 
+  filter(player_number == 1,
+         official_position %in% c("WR")) |> 
+    distinct(gameId, playId, displayName) |> 
+    mutate(receiver_in_left_alignment_new = TRUE)
+
+# Fixes the left side of the plays with WR in position 1 at snap
+total_two_left_one_plays_fixed_part1 <- messed_up_left |> 
+  inner_join(total_2_left_1_right_1_position1) |> 
+  left_join(fix_one_receiver_left_part1) |> 
   mutate(receiver_in_left_alignment = ifelse(is.na(receiver_in_left_alignment_new), FALSE, TRUE),
          num_receivers_left = 1) |> 
   select(- receiver_in_left_alignment_new) 
 
-total_two_left_one_plays_fixed |> 
+# seven of the plays are completely fixed; the others need the right side fixed
+finished_total_two_left_one_right_one_part1 <- total_two_left_one_plays_fixed_part1 |> 
   filter(num_receivers_left + num_receivers_right == total_receivers_in_alignment) |> 
   distinct(gameId, playId)
+
+
+total_two_right_one_plays
 
 
 
