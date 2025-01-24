@@ -617,6 +617,18 @@ messed_up_side_unsure |>
 
 ## Identifying which players are not actually receivers in alignment ----------------
 
+
+```{r}
+# creates a function that determines what kind of receiver alignment it is
+fixing_receivers <- function(data, t, l, r) {
+  data |> 
+  filter(total_receivers_in_alignment == t, num_receivers_one_side == l,
+         num_receivers_other_side == r,
+         frameType == "SNAP")
+}
+```
+
+
 ```{r}
 # creates a function that fixes the receiver alignment; For all number of receivers
 receivers_in_alignment_receivers_side <- function(identifier, fixing_side, data_adding_to, number_receivers, other_side){
@@ -678,13 +690,6 @@ finished_one_receiver_plays <- rbind(finished_total_one_receiver_left, finished_
 ### Plays with two receivers in alignment; one on each side ----------------------------
 
 ```{r}
-fixing_receivers <- function(data, t, l, r) {
-  data |> 
-  filter(total_receivers_in_alignment == t, num_receivers_one_side == l,
-         num_receivers_other_side == r,
-         frameType == "SNAP")
-}
-
 total_2_left_1_right_1 <- fixing_receivers(too_many_receiver_plays, 2, 1, 1)
 
 # there are 48 plays with 1 receiver on each side
@@ -846,14 +851,52 @@ finished_one_left_one_right_receiver_plays |>
   count(gameId, playId, receiver_in_right_alignment)
 ```
 
-### Plays with two receivers in alignment; two on left side and zero on right ------------
+### Plays with two receivers in alignment; two on one side and zero on other ------------
 
 ```{r}
-total_2_left_2_right_0 <- fixing_receivers(too_many_receiver_plays, 2, 2, 0)
+# there are two plays 
+total_2_side1_2_side2_0 <- fixing_receivers(too_many_receiver_plays, 2, 2, 0)
 
-total_2_left_2_right_0
+# there are 0 plays
+total_2_side1_0_side2_2 <- fixing_receivers(too_many_receiver_plays, 2, 0, 2)
+
+fix_total_two_left <- total_2_side1_2_side2_0 |> 
+  filter(player_number %in% c(1, 2),
+         official_position %in% c("WR", "TE"))
+
+fix_total_two_right <- total_2_side1_2_side2_0 |> 
+  filter(player_number %in% c(10, 11),
+         official_position %in% c("WR", "TE"))
+
+# Finishing the play with two receivers total, two on the left side
+finished_total_two_left <- receivers_in_alignment_receivers_side(fix_total_two_left, "left", too_many_receiver_plays, 2, "right")
+
+finished_total_two_left <- finished_total_two_left |> 
+  mutate(receiver_in_right_alignment = FALSE,
+         num_receivers_right = 0)
+
+# Finishing the play with two receivers total, two on the right side
+finished_total_two_right <- receivers_in_alignment_receivers_side(fix_total_two_right, "right", too_many_receiver_plays, 2, "left")
+
+finished_total_two_right <- finished_total_two_right |> 
+  mutate(receiver_in_left_alignment = FALSE,
+         num_receivers_left = 0)
 ```
 
+```{r}
+finished_total_two_same_side <- rbind(finished_total_two_left, finished_total_two_right)
+```
+
+
+### Plays with three receivers in alignment; two on one side and one on other ------------
+
+```{r}
+# there are 374 plays 
+total_3_side1_2_side2_1 <- fixing_receivers(too_many_receiver_plays, 3, 2, 1)
+
+total_3_side1_2_side2_1 |> 
+  arrange(gameId, playId, player_number)
+```
 
 # Identifying plays with not enough receivers in alignment -------------------------
 
